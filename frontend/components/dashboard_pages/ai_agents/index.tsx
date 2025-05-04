@@ -10,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Search, SendHorizontal, Wand2, Globe, SquarePen, Brain, Sparkles, Lightbulb } from "lucide-react";
+import { useRouter } from 'next/navigation';
+import QuestionGenerationPage from '@/components/dashboard_pages/ai_agents/question_generation/page';
 
 // Types
 interface Message {
@@ -27,10 +29,12 @@ interface AgentType {
 }
 
 export default function AIAgentsPage() {
+  const router = useRouter();
   const [activeAgent, setActiveAgent] = useState<string>('smart-counselor');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showQuestionGenerator, setShowQuestionGenerator] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [userType] = useState<'teacher' | 'student'>('teacher'); // Would be from context or props
 
@@ -53,6 +57,12 @@ export default function AIAgentsPage() {
       name: 'Smart Counselor',
       icon: <Brain className="h-6 w-6" />,
       description: 'Get guidance on personal and academic challenges'
+    },
+    {
+      id: 'question-generation',
+      name: 'Question Generation',
+      icon: <Lightbulb className="h-6 w-6" />,
+      description: 'Generate quizzes, tests, and assessment materials'
     },
     {
       id: 'lecture-planner',
@@ -349,103 +359,123 @@ export default function AIAgentsPage() {
             
             {activeAgent === 'content-generator' && (
               <div className="space-y-3">
-                <p className="text-xs font-medium">Quick Prompts</p>
-                <div className="grid gap-2">
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Generate a quiz on Newton's Laws of Motion")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Generate a physics quiz
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Create a biology worksheet about cell structure")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Create a biology worksheet
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Draft a lesson plan for teaching Shakespeare")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Draft a literature lesson plan
-                  </Button>
-                </div>
+                {/* Content Generator section */}
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Create lesson materials</h4>
+                    <p className="text-xs text-muted-foreground">Generate handouts, slides, and resources</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Assignment generator</h4>
+                    <p className="text-xs text-muted-foreground">Create custom homework and assignments</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Interactive activities</h4>
+                    <p className="text-xs text-muted-foreground">Create engaging class activities</p>
+                  </CardContent>
+                </Card>
               </div>
             )}
             
             {activeAgent === 'web-search' && (
               <div className="space-y-3">
-                <p className="text-xs font-medium">Search Options</p>
-                <div className="grid gap-2">
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Find recent research papers on project-based learning")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Find research papers
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Search for interactive math learning resources")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Find learning resources
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Get latest news about educational technology")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Educational technology news
-                  </Button>
-                </div>
+                {/* Web Search section */}
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Academic resources</h4>
+                    <p className="text-xs text-muted-foreground">Find journals, papers, and studies</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">News and current events</h4>
+                    <p className="text-xs text-muted-foreground">Find recent articles on a topic</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Educational websites</h4>
+                    <p className="text-xs text-muted-foreground">Discover teaching resources online</p>
+                  </CardContent>
+                </Card>
               </div>
             )}
             
             {activeAgent === 'smart-counselor' && (
               <div className="space-y-3">
-                <p className="text-xs font-medium">Guidance Topics</p>
-                <div className="grid gap-2">
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("I'm feeling overwhelmed by my coursework. How can I manage my time better?")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Time management advice
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("How can I help students who are struggling with test anxiety?")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Addressing test anxiety
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("What strategies can I use to better engage with introverted students?")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Working with introverted students
-                  </Button>
-                </div>
+                {/* Smart Counselor section */}
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Time management advice</h4>
+                    <p className="text-xs text-muted-foreground">Get tips for better productivity</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Addressing test anxiety</h4>
+                    <p className="text-xs text-muted-foreground">Strategies to reduce stress</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Working with introverted students</h4>
+                    <p className="text-xs text-muted-foreground">Support for different learning styles</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
+            {activeAgent === 'question-generation' && (
+              <div className="space-y-3">
+                {/* Question Generation section */}
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Create quiz questions</h4>
+                    <p className="text-xs text-muted-foreground">Generate multiple-choice and short answer questions</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Test bank generator</h4>
+                    <p className="text-xs text-muted-foreground">Build comprehensive question banks</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Assessment materials</h4>
+                    <p className="text-xs text-muted-foreground">Create exams with varying difficulty levels</p>
+                  </CardContent>
+                </Card>
               </div>
             )}
             
             {activeAgent === 'lecture-planner' && (
               <div className="space-y-3">
-                <p className="text-xs font-medium">Planning Templates</p>
-                <div className="grid gap-2">
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Create a 45-minute physics lesson on electromagnetic waves for 11th grade")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Physics lesson plan
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Design a week-long project for teaching world history to 9th graders")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    History project plan
-                  </Button>
-                  <Button variant="outline" className="justify-start text-sm" onClick={() => setInputValue("Create a differentiated math lesson on algebra for diverse learning needs")}>
-                    <Lightbulb className="mr-2 h-3 w-3" />
-                    Differentiated lesson plan
-                  </Button>
-                </div>
+                {/* Lecture Planner section */}
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Create lesson structure</h4>
+                    <p className="text-xs text-muted-foreground">Design organized lesson outlines</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Activity planning</h4>
+                    <p className="text-xs text-muted-foreground">Design engaging classroom activities</p>
+                  </CardContent>
+                </Card>
+                <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <CardContent className="p-3">
+                    <h4 className="font-medium text-sm">Curriculum mapping</h4>
+                    <p className="text-xs text-muted-foreground">Plan across multiple lessons or units</p>
+                  </CardContent>
+                </Card>
               </div>
             )}
-            
-            <Separator className="my-4" />
-            
-            {/* Recent activities section */}
-            <div>
-              <p className="text-xs font-medium mb-2">Recent Activities</p>
-              <div className="space-y-2">
-                {[
-                  { title: "Generated quiz on cell biology", time: "2 hours ago" },
-                  { title: "Created lesson plan for chemistry", time: "Yesterday" }
-                ].map((activity, index) => (
-                  <Card key={index} className="bg-accent/50">
-                    <CardContent className="p-3">
-                      <p className="text-sm font-medium">{activity.title}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </div>
