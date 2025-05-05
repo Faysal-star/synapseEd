@@ -94,7 +94,7 @@ export function AudioVisualizer({ mediaRecorder }: AudioVisualizerProps) {
   }, [mediaRecorder]);
 
   return (
-    <div className="flex-1 h-24 bg-background p-2 mx-auto">
+    <div className="flex-1 h-24 bg-background p-2 mx-auto w-full max-w-[300px]">
       <canvas
         ref={canvasRef}
         width={600}
