@@ -1,0 +1,12 @@
+flask
+flask-socketio
+flask-cors
+langchain
+langchain-community
+langchain-openai
+langchain-google-genai
+python-dotenv
+fpdf2
+gunicorn
+flask-restx
+werkzeug

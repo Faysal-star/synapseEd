@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -38,6 +39,7 @@ import {
   BookOpenCheck,
   Activity,
 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
 
 // Dummy data for demonstration
 const dummyData = {
@@ -118,8 +120,41 @@ const dummyData = {
 export default function StudentAnalyticsPage() {
   const [selectedExam, setSelectedExam] = useState(dummyData.exams[0].id);
   const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const supabase = createClient();
+
+  // Check authentication status when component mounts
+  useEffect(() => {
+    const checkUser = async () => {
+      setLoading(true);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error || !user) {
+        // User is not authenticated, redirect to login
+        router.push("/login");
+        return;
+      }
+      
+      setLoading(false);
+    };
+
+    checkUser();
+  }, [router, supabase.auth]);
 
   const selectedExamData = dummyData.exams.find(exam => exam.id === selectedExam);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 flex justify-center items-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
