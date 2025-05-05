@@ -5,10 +5,12 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 import json
+import tempfile
 from pdf_processor import PDFProcessor
 from vector_store import VectorStoreManager
 from llm_factory import LLMFactory
 from question_gen_agent import QuestionGenerationSystem
+from viva_gen import VivaAgent
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -25,6 +27,202 @@ os.makedirs(app.config['VECTOR_STORE_DIR'], exist_ok=True)
 llm_factory = LLMFactory()
 pdf_processor = PDFProcessor()
 vector_store_manager = VectorStoreManager(embedding_provider="openai")
+
+# Dictionary to store active VIVA sessions
+active_viva_sessions = {}
+
+# API key for authentication (for enhanced security, this should be loaded from environment variables)
+API_KEY = os.environ.get('API_KEY', '')
+
+# Middleware function to check API authentication
+def authenticate_request():
+    """Check API authentication from headers"""
+    auth_header = request.headers.get('Authorization')
+    api_key_header = request.headers.get('X-Api-Key')
+    
+    if auth_header:
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            return token == API_KEY if API_KEY else True
+    
+    if api_key_header:
+        return api_key_header == API_KEY if API_KEY else True
+    
+    # If no API_KEY is set, allow all requests (for development)
+    return not bool(API_KEY)
+
+# VIVA API endpoints
+@app.route('/api/viva/start', methods=['POST'])
+def viva_start():
+    """Start a new VIVA session"""
+    # Check authentication
+    if not authenticate_request():
+        return jsonify({"error": "Unauthorized access"}), 403
+        
+    try:
+        # Parse JSON data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        subject = data.get('subject')
+        if not subject:
+            return jsonify({"error": "Subject is required"}), 400
+            
+        topic = data.get('topic')
+        difficulty = data.get('difficulty', 'medium')
+        voice = data.get('voice', 'alloy')
+        
+        # Create a new VIVA agent
+        viva_agent = VivaAgent(
+            subject=subject,
+            topic=topic,
+            difficulty=difficulty,
+            voice=voice
+        )
+        
+        # Start the VIVA session
+        response_data = viva_agent.start_viva()
+        
+        # Store the agent in active sessions
+        session_id = response_data['session_id']
+        active_viva_sessions[session_id] = viva_agent
+        
+        # Return the response with audio as base64
+        return jsonify({
+            'session_id': session_id,
+            'text': response_data['text'],
+            'audio_url': f"data:audio/mp3;base64,{response_data['audio']}"
+        })
+        
+    except Exception as e:
+        print(f"Error starting VIVA session: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/viva/respond', methods=['POST'])
+def viva_respond():
+    """Process a student's response in a VIVA session"""
+    # Check authentication
+    if not authenticate_request():
+        return jsonify({"error": "Unauthorized access"}), 403
+    
+    try:
+        # Get session ID
+        session_id = request.form.get('session_id')
+        if not session_id:
+            return jsonify({"error": "Session ID is required"}), 400
+            
+        # Check if session exists
+        viva_agent = active_viva_sessions.get(session_id)
+        if not viva_agent:
+            return jsonify({"error": "Invalid or expired session"}), 404
+            
+        text = None
+        audio_file_path = None
+        
+        # Check for text input
+        if 'text' in request.form:
+            text = request.form.get('text')
+        
+        # Check for audio input
+        elif 'audio' in request.files:
+            audio_file = request.files['audio']
+            
+            # Create a temporary file for the audio
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as temp:
+                audio_file.save(temp)
+                audio_file_path = temp.name
+        
+        else:
+            return jsonify({"error": "No text or audio provided"}), 400
+            
+        # Process the response
+        response_data = viva_agent.process_student_response(
+            text=text,
+            audio_file=audio_file_path
+        )
+        
+        # Clean up temporary files
+        if audio_file_path and os.path.exists(audio_file_path):
+            os.remove(audio_file_path)
+            
+        # Handle error in processing
+        if 'error' in response_data:
+            return jsonify({"error": response_data['error']}), 400
+            
+        # Return the response with audio as base64
+        return jsonify({
+            'session_id': session_id,
+            'text': response_data['text'],
+            'audio_url': f"data:audio/mp3;base64,{response_data['audio']}"
+        })
+        
+    except Exception as e:
+        print(f"Error processing VIVA response: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/viva/end', methods=['POST'])
+def viva_end():
+    """End a VIVA session and get final assessment"""
+    # Check authentication
+    if not authenticate_request():
+        return jsonify({"error": "Unauthorized access"}), 403
+    
+    try:
+        # Parse JSON data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        session_id = data.get('session_id')
+        if not session_id:
+            return jsonify({"error": "Session ID is required"}), 400
+            
+        # Check if session exists
+        viva_agent = active_viva_sessions.get(session_id)
+        if not viva_agent:
+            return jsonify({"error": "Invalid or expired session"}), 404
+            
+        # End the VIVA session
+        response_data = viva_agent.end_viva()
+        
+        # Remove the session from active sessions
+        active_viva_sessions.pop(session_id, None)
+        
+        # Return the final assessment with audio as base64
+        return jsonify({
+            'session_id': session_id,
+            'text': response_data['text'],
+            'audio_url': f"data:audio/mp3;base64,{response_data['audio']}",
+            'conversation': response_data['conversation_history']
+        })
+        
+    except Exception as e:
+        print(f"Error ending VIVA session: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/viva/history/<session_id>', methods=['GET'])
+def viva_history(session_id):
+    """Get the conversation history for a VIVA session"""
+    # Check authentication
+    if not authenticate_request():
+        return jsonify({"error": "Unauthorized access"}), 403
+    
+    try:
+        # Check if session exists
+        viva_agent = active_viva_sessions.get(session_id)
+        if not viva_agent:
+            return jsonify({"error": "Invalid or expired session"}), 404
+            
+        # Return the session information and conversation history
+        return jsonify({
+            'session_info': viva_agent.get_session_info(),
+            'conversation': viva_agent.conversation_history
+        })
+        
+    except Exception as e:
+        print(f"Error retrieving VIVA history: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
