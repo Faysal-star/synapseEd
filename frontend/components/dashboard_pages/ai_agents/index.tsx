@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -26,6 +25,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Types
 interface Message {
@@ -89,31 +89,31 @@ export default function AIAgentsPage() {
     {
       id: 'content-generator',
       name: 'Content Generator',
-      icon: <Sparkles className="h-6 w-6" />,
+      icon: <Sparkles className="h-5 w-5" />,
       description: 'Generate dynamic content and teaching materials'
     },
     {
       id: 'web-search',
       name: 'Web Search',
-      icon: <Globe className="h-6 w-6" />,
+      icon: <Globe className="h-5 w-5" />,
       description: 'Find information and resources from the web'
     },
     {
       id: 'smart-counselor',
       name: 'Smart Counselor',
-      icon: <Brain className="h-6 w-6" />,
+      icon: <Brain className="h-5 w-5" />,
       description: 'Get guidance on personal and academic challenges'
     },
     {
       id: 'question-generation',
       name: 'Question Generation',
-      icon: <Lightbulb className="h-6 w-6" />,
+      icon: <Lightbulb className="h-5 w-5" />,
       description: 'Generate quizzes, tests, and assessment materials'
     },
     {
       id: 'lecture-planner',
       name: 'Lecture Planner',
-      icon: <SquarePen className="h-6 w-6" />,
+      icon: <SquarePen className="h-5 w-5" />,
       description: 'Create comprehensive lesson plans and activities'
     }
   ];
@@ -359,10 +359,12 @@ export default function AIAgentsPage() {
         <h1 className="text-2xl font-bold">AI Agents</h1>
         <div className="flex items-center space-x-2">
           {(showQuestionGenerator && activeAgent === 'question-generation') || 
-           (showWebSearch && activeAgent === 'web-search') ? (
+           (showWebSearch && activeAgent === 'web-search') ||
+           (showLecturePlanner && activeAgent === 'lecture-planner') ? (
             <Button variant="outline" size="sm" onClick={() => {
               setShowQuestionGenerator(false);
               setShowWebSearch(false);
+              setShowLecturePlanner(false);
             }}>
               Back to Agents
             </Button>
@@ -441,30 +443,36 @@ export default function AIAgentsPage() {
 
           {/* Main chat area */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="bg-muted/30 p-2 flex items-center justify-center">
-              <Tabs defaultValue={activeAgent} onValueChange={setActiveAgent}>
-                <TabsList>
-                  {agents.map(agent => (
-                    <TabsTrigger 
-                      key={agent.id} 
-                      value={agent.id}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="h-5 w-5">
-                        {agent.icon}
-                      </div>
-                      <span>{agent.name}</span>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+            {/* Agent selector dropdown */}
+            <div className="bg-muted/30 p-4 flex justify-center">
+              <div className="w-full max-w-xs">
+                <Select 
+                  value={activeAgent} 
+                  onValueChange={setActiveAgent}
+                >
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center gap-2">
+                      {agents.find(agent => agent.id === activeAgent)?.icon}
+                      <span>{agents.find(agent => agent.id === activeAgent)?.name}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agents.map(agent => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        <div className="flex items-center gap-2">
+                          {agent.icon}
+                          <span>{agent.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Chat history */}
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
-                
-                
                 {messages.map(message => (
                   <div
                     key={message.id}
@@ -676,8 +684,8 @@ export default function AIAgentsPage() {
               </div>
             </ScrollArea>
 
-            {/* Agent info section */}
-            <div className="absolute bottom-24 right-6">
+            {/* Agent info badge - now positioned more responsively */}
+            <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0">
               <div className="flex space-x-2">
                 {agents.map(agent => (
                   agent.id === activeAgent && (
@@ -732,8 +740,8 @@ export default function AIAgentsPage() {
             </div>
           </div>
 
-          {/* Right sidebar - Agent functionality */}
-          <div className="w-80 border-l hidden lg:block">
+          {/* Right sidebar - Agent functionality (now with better responsive behavior) */}
+          <div className="w-64 lg:w-72 border-l hidden md:block">
             <div className="p-4">
               <h3 className="font-semibold mb-2">
                 {agents.find(agent => agent.id === activeAgent)?.name}
@@ -804,10 +812,10 @@ export default function AIAgentsPage() {
                       onClick={() => setShowWebSearch(true)}
                     >
                       <Globe className="mr-2 h-4 w-4" />
-                      Launch Advanced Web Search
+                      Launch Advanced Search
                     </Button>
                     <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Use the advanced interface for better results
+                      Use the advanced interface
                     </p>
                   </div>
                 </div>
@@ -830,8 +838,8 @@ export default function AIAgentsPage() {
                   </Card>
                   <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
                     <CardContent className="p-3">
-                      <h4 className="font-medium text-sm">Working with introverted students</h4>
-                      <p className="text-xs text-muted-foreground">Support for different learning styles</p>
+                      <h4 className="font-medium text-sm">Working with students</h4>
+                      <p className="text-xs text-muted-foreground">Support for learning styles</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -846,7 +854,7 @@ export default function AIAgentsPage() {
                   >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Create quiz questions</h4>
-                      <p className="text-xs text-muted-foreground">Generate multiple-choice and short answer questions</p>
+                      <p className="text-xs text-muted-foreground">Generate multiple-choice questions</p>
                     </CardContent>
                   </Card>
                   <Card 
@@ -855,7 +863,7 @@ export default function AIAgentsPage() {
                   >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Test bank generator</h4>
-                      <p className="text-xs text-muted-foreground">Build comprehensive question banks</p>
+                      <p className="text-xs text-muted-foreground">Build question banks</p>
                     </CardContent>
                   </Card>
                   <Card 
@@ -864,7 +872,7 @@ export default function AIAgentsPage() {
                   >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Assessment materials</h4>
-                      <p className="text-xs text-muted-foreground">Create exams with varying difficulty levels</p>
+                      <p className="text-xs text-muted-foreground">Create varying difficulty exams</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -879,7 +887,7 @@ export default function AIAgentsPage() {
                   >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Create New Lecture Plan</h4>
-                      <p className="text-xs text-muted-foreground">Generate complete lesson plans</p>
+                      <p className="text-xs text-muted-foreground">Generate lesson plans</p>
                     </CardContent>
                   </Card>
                   <Card 
@@ -888,7 +896,7 @@ export default function AIAgentsPage() {
                   >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Edit Existing Plans</h4>
-                      <p className="text-xs text-muted-foreground">Modify and improve your lecture plans</p>
+                      <p className="text-xs text-muted-foreground">Modify lecture plans</p>
                     </CardContent>
                   </Card>
                   <Card 
@@ -897,7 +905,7 @@ export default function AIAgentsPage() {
                   >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">API-Powered Planning</h4>
-                      <p className="text-xs text-muted-foreground">Use our API for advanced features</p>
+                      <p className="text-xs text-muted-foreground">Use advanced features</p>
                     </CardContent>
                   </Card>
                   
@@ -908,10 +916,10 @@ export default function AIAgentsPage() {
                       onClick={() => setShowLecturePlanner(true)}
                     >
                       <SquarePen className="mr-2 h-4 w-4" />
-                      Launch Lecture Planner
+                      Launch Planner
                     </Button>
                     <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Use the full interface for better results
+                      Use the full interface
                     </p>
                   </div>
                 </div>

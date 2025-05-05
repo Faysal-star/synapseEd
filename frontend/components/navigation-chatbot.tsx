@@ -270,7 +270,7 @@ export default function ChatBot() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="fixed right-0 top-1/2 transform -translate-y-1/2 z-40"
+            className="fixed right-0 top-1/2 transform -translate-y-1/2 z-50"
           >
             <Button
               onClick={toggleChatBot}
@@ -297,7 +297,7 @@ export default function ChatBot() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-[350px] md:w-[400px] z-30 shadow-2xl"
+            className="fixed right-0 top-0 bottom-0 w-[350px] md:w-[400px] z-50 shadow-2xl"
           >
             <Card className="h-full flex flex-col bg-background/95 backdrop-blur-sm border-l border-y border-r-0 border-slate-200/20 dark:border-slate-800/20 rounded-l-2xl rounded-r-none">
               <CardHeader className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 flex flex-row items-center justify-between gap-2 rounded-tl-2xl">
