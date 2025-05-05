@@ -212,7 +212,7 @@ export default function ChatBot() {
     ];
 
     return (
-      <div className="flex flex-col items-center space-y-2 w-full py-2">
+      <div className=" flex flex-col items-center space-y-2 w-full py-2">
         <motion.div 
           animate={{ 
             scale: [1, 1.1, 1],

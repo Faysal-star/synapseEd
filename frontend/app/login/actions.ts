@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { v4 as uuidv4 } from 'uuid'
 
 import { createClient } from '@/utils/supabase/server'
+import { createClient as c } from '@supabase/supabase-js'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -18,7 +19,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    redirect('/error')
+    redirect(`/error?message=${error.message}`)
   }
 
   revalidatePath('/', 'layout')
@@ -27,6 +28,10 @@ export async function login(formData: FormData) {
 
 export async function signup(formData: FormData) {
   const supabase = await createClient()
+  const supabaseAdmin = c(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
 
   // Type casting with proper null checks
   const email = formData.get('email') as string
@@ -43,7 +48,7 @@ export async function signup(formData: FormData) {
 
   if (signUpError || !signUpData.user) {
     console.error('Sign up error:', signUpError)
-    return redirect('/error')
+    redirect(`/error?message=${"Signup error:" + signUpError?.message}`)
   }
 
   const user = signUpData.user
@@ -54,7 +59,7 @@ export async function signup(formData: FormData) {
     const fileExt = avatarFile.name.split('.').pop()
     const filePath = `avatars/${uuidv4()}.${fileExt}` // Store avatar under 'avatars' folder
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from('avatars') // Ensure this is the correct bucket name
       .upload(filePath, avatarFile, {
         cacheControl: '3600',
@@ -64,23 +69,23 @@ export async function signup(formData: FormData) {
 
     if (uploadError) {
       console.error('Upload error:', uploadError)
-      return redirect('/error')
+      redirect(`/error?message=${"Upload error: "+uploadError.message}`)
     }
     // Get the public URL of the uploaded avatar image
-    const { data: publicUrlData } = supabase.storage
+    const { data: publicUrlData } = supabaseAdmin.storage
       .from('avatars')
       .getPublicUrl(filePath)
 
     if (!publicUrlData?.publicUrl) {
       console.error('Error getting file public URL')
-      return redirect('/error')
+      redirect(`/error?message=${"Error getting file public URL"}`)
     }
     avatarUrl = publicUrlData.publicUrl
   }
 
   // 3. Insert user profile data into the 'profiles' table
   const { error: insertError } = await supabase.from('profiles').insert({
-    id: user.id, // Ensure the 'id' is set to the user's authenticated ID
+    id: user.id,
     name,
     email,
     role,
@@ -89,7 +94,7 @@ export async function signup(formData: FormData) {
 
   if (insertError) {
     console.error('Insert profile error:', insertError)
-    return redirect('/error')
+    redirect(`/error?message=${"Insert Error:"+insertError.message}`)
   }
 
   // Optional: trigger revalidation (if you're using Next.js Incremental Static Regeneration)

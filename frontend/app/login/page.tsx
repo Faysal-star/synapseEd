@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex justify-center items-center min-h-[80vh] w-full px-4">
-      <Card className="w-full max-w-md border-black dark:border-white bg-white dark:bg-zinc-900">
+      <Card className="w-full max-w-md border-black dark:border-white bg-white dark:bg-zinc-900 my-auto">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-black dark:text-white text-center">
             {isSignUp ? 'Create Account' : 'Log In'}
@@ -57,6 +57,7 @@ export default function LoginPage() {
                     Role
                   </Label>
                   <select
+                    title='Select Role'
                     id="role"
                     name="role"
                     required

@@ -12,7 +12,10 @@ export function HeroSection() {
     setMounted(true)
   }, [])
 
-  if (!mounted) return null
+  // an empty cmpone t with the height of the screen to prevent the page from jumping when the hero section is loaded
+  if (!mounted) return (
+    <div className="h-screen w-full" />
+  )
 
   return (
     <section className="w-full py-12 md:py-24 lg:py-32 xl:py-40">
@@ -61,7 +64,9 @@ export function HeroSection() {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-3"
             >
-              <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 text-white group h-12 px-6">
+              <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 text-white group h-12 px-6 cursor-pointer"
+              onClick={() => window.location.href = "/login"}
+              >
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>

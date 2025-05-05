@@ -1,4 +1,7 @@
+'use client';
+
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { HeroSection } from "@/components/hero-section"
 import { FeatureSection } from "@/components/feature-section"
@@ -6,9 +9,21 @@ import { CTASection } from "@/components/cta-section"
 import { Footer } from "@/components/footer"
 import { ModeToggle } from "@/components/mode-toggle"
 import ChatBot from "@/components/navigation-chatbot";
-import { Navigation } from "lucide-react"
+import { createClient } from "@/utils/supabase/client"
 
 export default function Home() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  useEffect(() => {
+    const checkUserSession = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
+    };
+    
+    checkUserSession();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Navigation - Fixed at the top with glass morphism */}
@@ -39,9 +54,9 @@ export default function Home() {
             </nav>
             <div className="flex items-center gap-4">
               <ModeToggle />
-              <Button  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/30"
-                ><Link href="/dashboard">
-                Go to Dashboard
+              <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/30">
+                <Link href={isLoggedIn ? "/dashboard" : "/login"}>
+                  {isLoggedIn ? "Go to Dashboard" : "Get Started"}
                 </Link>
               </Button>
             </div>
@@ -49,7 +64,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex flex-col items-center mt-16">
+      <main className="flex flex-col items-center">
         {/* Background gradient */}
         <div className="fixed inset-0 -z-10 h-full w-full bg-white dark:bg-neutral-950">
           <div className="absolute h-full w-full bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#1a1a1a_1px,transparent_1px)]"></div>

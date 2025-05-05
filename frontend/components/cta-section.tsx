@@ -120,7 +120,9 @@ export function CTASection() {
               </div>
               
               <div className="flex flex-col gap-2 min-[400px]:flex-row pt-4">
-                <Button size="lg" className="bg-white text-purple-700 hover:bg-white/90 group h-12 px-6">
+                <Button size="lg" className="bg-white text-purple-700 hover:bg-white/90 group h-12 px-6"
+                  onClick={() => window.location.href = "/login"}
+                  >
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
