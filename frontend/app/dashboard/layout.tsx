@@ -49,6 +49,7 @@ const studentNavItems = [
   { href: "/dashboard/ai-agents", icon: Brain, title: "AI Agents" },
   { href: "/dashboard/exams", icon: BookOpenCheck, title: "Exams" },
   { href: "/dashboard/viva", icon: SpeechIcon, title: "Viva Trainer" },
+  { href: "/dashboard/viva", icon: SpeechIcon, title: "Viva Trainer" },
   { href: "/dashboard/ai-counselor", icon: Users, title: "AI Counselor" },
   { href: "/dashboard/whiteboard", icon: PenBox, title: "Whiteboard" },
   { href: "/dashboard/settings", icon: Cog, title: "Settings" },
