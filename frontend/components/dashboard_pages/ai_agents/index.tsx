@@ -9,9 +9,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Search, SendHorizontal, Wand2, Globe, SquarePen, Brain, Sparkles, Lightbulb } from "lucide-react";
+import { Search, SendHorizontal, Wand2, Globe, SquarePen, Brain, Sparkles, Lightbulb, AlertCircle, ThumbsUp, ThumbsDown, Check, Info } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { toast } from "@/components/ui/use-toast";
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import QuestionGenerationPage from '@/components/dashboard_pages/ai_agents/question_generation/page';
+import WebSearchPage from '@/components/dashboard_pages/ai_agents/web_search/page';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Types
 interface Message {
@@ -19,7 +32,19 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  isMarkdown?: boolean; // Flag to indicate if content should be rendered as markdown
+  messageId?: string; // Unique message ID from the API for feedback
+  hasFeedback?: boolean; // Track if feedback was given
+  reasoning?: any[]; // For storing reasoning steps
 }
+
+// Feedback form schema
+const feedbackSchema = z.object({
+  rating: z.number().min(1).max(5),
+  feedbackText: z.string().optional(),
+});
+
+type FeedbackFormValues = z.infer<typeof feedbackSchema>;
 
 interface AgentType {
   id: string;
@@ -35,8 +60,25 @@ export default function AIAgentsPage() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showQuestionGenerator, setShowQuestionGenerator] = useState(false);
+  const [showWebSearch, setShowWebSearch] = useState(false);
+  const [showReasoning, setShowReasoning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [userType] = useState<'teacher' | 'student'>('teacher'); // Would be from context or props
+  
+  // Feedback dialog state
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedbackMessageId, setFeedbackMessageId] = useState<string | null>(null);
+  const [initialRating, setInitialRating] = useState<number>(3);
+  const [conversationId, setConversationId] = useState<string>('');
+
+  // Create form
+  const form = useForm<FeedbackFormValues>({
+    resolver: zodResolver(feedbackSchema),
+    defaultValues: {
+      rating: 3,
+      feedbackText: '',
+    },
+  });
 
   // Available agents based on user type
   const agents: AgentType[] = [
@@ -89,6 +131,13 @@ export default function AIAgentsPage() {
     setMessages([initialMessage]);
   }, [activeAgent]);
 
+  // Effect to handle active agent changes
+  useEffect(() => {
+    // Reset UI state when agent changes
+    setShowQuestionGenerator(false);
+    setShowWebSearch(false);
+  }, [activeAgent]);
+
   // Get welcome message based on agent
   const getInitialMessage = (agentId: string) => {
     switch (agentId) {
@@ -102,6 +151,78 @@ export default function AIAgentsPage() {
         return "I'll help you create structured lesson plans tailored to your curriculum. What subject and grade level are you planning for?";
       default:
         return "How can I help you today?";
+    }
+  };
+
+  const submitFeedback = async (messageId: string, rating: number, feedbackText = '') => {
+    try {
+      // Call the backend API
+      const backendUrl = 'http://localhost:5003';
+      const response = await fetch(`${backendUrl}/api/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          message_id: messageId,
+          rating: rating,
+          feedback_text: feedbackText
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      // Mark the message as having feedback
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.role === 'assistant' && msg.messageId === messageId 
+            ? { ...msg, hasFeedback: true } 
+            : msg
+        )
+      );
+      
+      toast({
+        title: "Feedback submitted",
+        description: "Thank you for your feedback!",
+        variant: "default"
+      });
+      
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      
+      toast({
+        title: "Error",
+        description: "Failed to submit feedback. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Function to open feedback dialog
+  const openFeedbackDialog = (messageId: string, initialRating: number) => {
+    setFeedbackMessageId(messageId);
+    setInitialRating(initialRating);
+    form.reset({ rating: initialRating, feedbackText: '' });
+    setFeedbackDialogOpen(true);
+  };
+
+  // Function to handle feedback form submission
+  const onFeedbackSubmit = (values: FeedbackFormValues) => {
+    if (feedbackMessageId) {
+      submitFeedback(feedbackMessageId, values.rating, values.feedbackText);
+      setFeedbackDialogOpen(false);
+    }
+  };
+
+  // Function to toggle viewing reasoning
+  const toggleReasoning = (messageId: string) => {
+    if (showReasoning === messageId) {
+      setShowReasoning(null);
+    } else {
+      setShowReasoning(messageId);
     }
   };
 
@@ -122,20 +243,92 @@ export default function AIAgentsPage() {
     setInputValue('');
     setIsLoading(true);
     
-    // Simulate API response delay
-    setTimeout(() => {
-      const agentResponse = generateAgentResponse(activeAgent, inputValue);
-      
-      const newAssistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: agentResponse,
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, newAssistantMessage]);
-      setIsLoading(false);
-    }, 1000);
+    // If web-search is active, use actual API call instead of mock response
+    if (activeAgent === 'web-search') {
+      try {
+        // Generate a conversation ID if one doesn't exist
+        const currentConvoId = conversationId || `${activeAgent}-${Date.now()}`;
+        if (!conversationId) {
+          setConversationId(currentConvoId);
+        }
+        
+        const backendUrl = 'http://localhost:5003';
+        const response = await fetch(`${backendUrl}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: inputValue,
+            conversation_id: currentConvoId,
+            context: {
+              agent_type: activeAgent,
+            }
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        const newAssistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.response,
+          timestamp: new Date(),
+          isMarkdown: true, // API responses are markdown formatted
+          messageId: data.message_id, // Use the correct property name from API
+          reasoning: data.reasoning // Store reasoning steps
+        };
+        
+        setMessages(prev => [...prev, newAssistantMessage]);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error sending message to API:', error);
+        
+        // Show error toast
+        if (typeof window !== 'undefined' && window.document && 'toast' in window) {
+          // @ts-ignore
+          toast({
+            title: "API Connection Error",
+            description: "Failed to connect to the search backend. Using mock response instead.",
+            variant: "destructive"
+          });
+        }
+        
+        // Fallback to mock response if API call fails
+        const agentResponse = generateAgentResponse(activeAgent, inputValue);
+        
+        const newAssistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentResponse,
+          timestamp: new Date(),
+          isMarkdown: false // Mock responses are not markdown
+        };
+        
+        setMessages(prev => [...prev, newAssistantMessage]);
+        setIsLoading(false);
+      }
+    } else {
+      // For other agents, use the mock response as before
+      setTimeout(() => {
+        const agentResponse = generateAgentResponse(activeAgent, inputValue);
+        
+        const newAssistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: agentResponse,
+          timestamp: new Date(),
+          isMarkdown: false // Mock responses are not markdown
+        };
+        
+        setMessages(prev => [...prev, newAssistantMessage]);
+        setIsLoading(false);
+      }, 1000);
+    }
   };
 
   // Mock response generation - would be replaced with actual API calls
@@ -144,7 +337,7 @@ export default function AIAgentsPage() {
       case 'content-generator':
         return `Here's a draft content based on your request: "${query}"\n\n[Generated content would appear here based on the actual implementation]`;
       case 'web-search':
-        return `I searched for information about "${query}"\n\nHere are some relevant results: \n1. [Result 1 description]\n2. [Result 2 description]\n3. [Result 3 description]`;
+        return `[MOCK RESPONSE - API CONNECTION FAILED]\n\nI searched for information about "${query}"\n\nHere are some relevant results: \n1. [Result 1 description]\n2. [Result 2 description]\n3. [Result 3 description]`;
       case 'smart-counselor':
         return `Thank you for sharing that. Based on what you've told me about "${query}", I would suggest...\n\n[Personalized guidance would appear here]`;
       case 'lecture-planner':
@@ -160,11 +353,15 @@ export default function AIAgentsPage() {
       <div className="flex justify-between items-center p-4 border-b">
         <h1 className="text-2xl font-bold">AI Agents</h1>
         <div className="flex items-center space-x-2">
-          {showQuestionGenerator && activeAgent === 'question-generation' && (
-            <Button variant="outline" size="sm" onClick={() => setShowQuestionGenerator(false)}>
+          {(showQuestionGenerator && activeAgent === 'question-generation') || 
+           (showWebSearch && activeAgent === 'web-search') ? (
+            <Button variant="outline" size="sm" onClick={() => {
+              setShowQuestionGenerator(false);
+              setShowWebSearch(false);
+            }}>
               Back to Agents
             </Button>
-          )}
+          ) : null}
           <Button variant="outline" size="sm">
             <Wand2 className="mr-2 h-4 w-4" />
             Settings
@@ -176,6 +373,10 @@ export default function AIAgentsPage() {
       {showQuestionGenerator && activeAgent === 'question-generation' ? (
         <div className="flex-1 overflow-y-auto">
           <QuestionGenerationPage />
+        </div>
+      ) : showWebSearch && activeAgent === 'web-search' ? (
+        <div className="flex-1 overflow-y-auto">
+          <WebSearchPage />
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
@@ -253,6 +454,8 @@ export default function AIAgentsPage() {
             {/* Chat history */}
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
+                
+                
                 {messages.map(message => (
                   <div
                     key={message.id}
@@ -269,16 +472,179 @@ export default function AIAgentsPage() {
                         "max-w-[80%] rounded-lg p-4",
                         message.role === 'user' 
                           ? "bg-primary text-primary-foreground" 
-                          : "bg-accent"
+                          : message.isMarkdown
+                            ? "bg-accent/80 border border-accent-foreground/10" 
+                            : "bg-accent"
                       )}
                     >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                      <div className={cn(
-                        "text-xs mt-2", 
-                        message.role === 'user' ? "text-primary-foreground/70" : "text-muted-foreground"
-                      )}>
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <div className="whitespace-pre-wrap">
+                        {message.isMarkdown ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown 
+                              rehypePlugins={[rehypeRaw]}
+                              components={{
+                                a: ({ node, ...props }) => (
+                                  <a 
+                                    {...props} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline" 
+                                  />
+                                ),
+                                ul: ({ node, ...props }) => (
+                                  <ul {...props} className="list-disc pl-4 my-2" />
+                                ),
+                                ol: ({ node, ...props }) => (
+                                  <ol {...props} className="list-decimal pl-4 my-2" />
+                                ),
+                                li: ({ node, ...props }) => (
+                                  <li {...props} className="mt-1" />
+                                ),
+                                h1: ({ node, ...props }) => (
+                                  <h1 {...props} className="text-lg font-bold mt-3 mb-1" />
+                                ),
+                                h2: ({ node, ...props }) => (
+                                  <h2 {...props} className="text-md font-bold mt-3 mb-1" />
+                                ),
+                                h3: ({ node, ...props }) => (
+                                  <h3 {...props} className="font-bold mt-2 mb-1" />
+                                ),
+                                p: ({ node, ...props }) => (
+                                  <p {...props} className="my-1.5" />
+                                ),
+                                code: ({ className, children, node, ...props }: any) => {
+                                  const match = /language-(\w+)/.exec(className || '');
+                                  const isInline = !match;
+                                  return !isInline ? (
+                                    <div className="my-2">
+                                      <div className="bg-black/70 text-xs text-white px-2 py-1 rounded-t-md">
+                                        {match?.[1] || 'Code'}
+                                      </div>
+                                      <code
+                                        className={cn(
+                                          "block bg-black/10 dark:bg-black/50 p-2 rounded-b-md overflow-x-auto text-xs",
+                                          className
+                                        )}
+                                        {...props}
+                                      >
+                                        {children}
+                                      </code>
+                                    </div>
+                                  ) : (
+                                    <code
+                                      className="bg-black/10 dark:bg-black/30 px-1 py-0.5 rounded text-xs"
+                                      {...props}
+                                    >
+                                      {children}
+                                    </code>
+                                  );
+                                }
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          message.content
+                        )}
                       </div>
+                      
+                      <div className="flex items-center justify-between mt-2">
+                        <span className={cn(
+                          "text-xs", 
+                          message.role === 'user' ? "text-primary-foreground/70" : "text-muted-foreground"
+                        )}>
+                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        
+                        {activeAgent === 'web-search' && message.role === 'assistant' && message.messageId && (
+                          <div className="flex items-center space-x-1">
+                            {message.reasoning && message.reasoning.length > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-6 w-6"
+                                      onClick={() => toggleReasoning(message.id)}
+                                    >
+                                      <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Show reasoning</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            
+                            {!message.hasFeedback ? (
+                              <>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6"
+                                        onClick={() => openFeedbackDialog(message.messageId!, 5)}
+                                      >
+                                        <ThumbsUp className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>This was helpful</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6"
+                                        onClick={() => openFeedbackDialog(message.messageId!, 1)}
+                                      >
+                                        <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>This was not helpful</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted-foreground flex items-center">
+                                <Check className="h-3 w-3 mr-1" /> 
+                                Feedback submitted
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Reasoning section */}
+                      {showReasoning === message.id && message.reasoning && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-3 pt-3 border-t text-xs text-muted-foreground"
+                        >
+                          <h4 className="font-medium mb-1">Reasoning Process:</h4>
+                          <ol className="space-y-1 list-decimal list-inside">
+                            {message.reasoning.map((step, idx) => (
+                              <li key={idx} className="text-xs">
+                                <span className="font-medium">{step.type}:</span> {step.content}
+                              </li>
+                            ))}
+                          </ol>
+                        </motion.div>
+                      )}
                     </motion.div>
                   </div>
                 ))}
@@ -394,24 +760,47 @@ export default function AIAgentsPage() {
               {activeAgent === 'web-search' && (
                 <div className="space-y-3">
                   {/* Web Search section */}
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowWebSearch(true)}
+                  >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Academic resources</h4>
                       <p className="text-xs text-muted-foreground">Find journals, papers, and studies</p>
                     </CardContent>
                   </Card>
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowWebSearch(true)}
+                  >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">News and current events</h4>
                       <p className="text-xs text-muted-foreground">Find recent articles on a topic</p>
                     </CardContent>
                   </Card>
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowWebSearch(true)}
+                  >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Educational websites</h4>
                       <p className="text-xs text-muted-foreground">Discover teaching resources online</p>
                     </CardContent>
                   </Card>
+                  
+                  {/* Launch advanced search button */}
+                  <div className="mt-6">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setShowWebSearch(true)}
+                    >
+                      <Globe className="mr-2 h-4 w-4" />
+                      Launch Advanced Web Search
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Use the advanced interface for better results
+                    </p>
+                  </div>
                 </div>
               )}
               
@@ -499,6 +888,81 @@ export default function AIAgentsPage() {
           </div>
         </div>
       )}
+      
+      {/* Feedback Dialog */}
+      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share your feedback</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onFeedbackSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="rating"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel>How helpful was this response?</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        defaultValue={initialRating.toString()}
+                        className="flex space-x-4"
+                      >
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <FormItem key={rating} className="flex items-center space-x-1 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value={rating.toString()} id={`rating-${rating}`} />
+                            </FormControl>
+                            <Label htmlFor={`rating-${rating}`} className="text-sm cursor-pointer">
+                              {rating}
+                            </Label>
+                          </FormItem>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      1 = Not helpful at all, 5 = Extremely helpful
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="feedbackText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Additional comments (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="What could be improved about this response?"
+                        {...field}
+                        className="resize-none"
+                        rows={3}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter className="flex gap-2 sm:gap-0">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setFeedbackDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Submit Feedback</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
