@@ -1,0 +1,11 @@
+flask
+flask-cors
+flask-socketio
+python-socketio
+python-engineio
+openai
+python-dotenv
+soundfile
+numpy
+setuptools
+wheel 
