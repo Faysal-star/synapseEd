@@ -12,7 +12,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, AlertCircle, HelpCircle, CheckCircle, ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { Clock, AlertCircle, HelpCircle, CheckCircle, ChevronLeft, ChevronRight, Flag, Eye } from "lucide-react";
+import EyeTrackingProctor from "@/components/ui/EyeTrackingProctor";
+import DisqualificationScreen from "@/components/ui/DisqualificationScreen";
+import { toast } from 'sonner';
 
 // Types
 interface ExamQuestion {
@@ -56,6 +59,10 @@ export default function ExamPage() {
   const [isExamEnding, setIsExamEnding] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [proctorEnabled, setProctorEnabled] = useState(false);
+  const [showProctorVideo, setShowProctorVideo] = useState(false);
+  const [disqualified, setDisqualified] = useState(false);
+  const [examStatus, setExamStatus] = useState<'not-started' | 'in-progress' | 'completed' | 'disqualified'>('not-started');
 
   // Navigation state
   const [showNavigator, setShowNavigator] = useState(false);
@@ -70,6 +77,9 @@ export default function ExamPage() {
     hidden: { opacity: 0, x: 50 },
     visible: { opacity: 1, x: 0 }
   };
+
+  // Proctor dialog state
+  const [showProctorDialog, setShowProctorDialog] = useState(true);
 
   useEffect(() => {
     async function fetchExamData() {
@@ -106,6 +116,7 @@ export default function ExamPage() {
         setAnswerState(initialAnswerState);
         
         setLoading(false);
+        setExamStatus('not-started');
       } catch (error) {
         console.error('Error loading exam:', error);
         setLoading(false);
@@ -265,6 +276,50 @@ export default function ExamPage() {
     router.push(`/dashboard/exams/${examId}/results`);
   };
 
+  // Handle cheating detected
+  const handleCheatingDetected = (reason: string = "Looking away from screen for too long") => {
+    // Store reason in localStorage
+    localStorage.setItem(`exam_disqualification_reason_${examId}`, reason);
+    
+    // Set disqualified state
+    setDisqualified(true);
+    setExamStatus('disqualified');
+    
+    // Log the incident
+    console.log(`Exam disqualification: ${reason}`);
+  };
+
+  // Start proctor after accepting terms
+  const startProctoring = () => {
+    setProctorEnabled(true);
+    setShowProctorDialog(false);
+    setExamStatus('in-progress');
+    toast.success("Exam proctoring has been enabled", {
+      description: "Please stay focused on the exam window. Looking away for more than 5 seconds will result in disqualification."
+    });
+  };
+
+  // Add tab switching detection
+  useEffect(() => {
+    if (examStatus !== "in-progress") return;
+    
+    // Handler for tab visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && examStatus === "in-progress") {
+        console.log("Tab switching detected - triggering disqualification");
+        handleCheatingDetected("Tab switching detected");
+      }
+    };
+    
+    // Add event listeners
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [examStatus]);
+
   // Calculate current question number for display
   const currentQuestionNumber = currentQuestionIndex + 1;
   const currentQuestion = exam?.questions?.[currentQuestionIndex];
@@ -294,8 +349,70 @@ export default function ExamPage() {
     );
   }
 
+  if (disqualified) {
+    return (
+      <div className="container py-6 max-w-6xl mx-auto flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <DisqualificationScreen examId={examId} />
+      </div>
+    );
+  }
+
   return (
     <div className="container py-6 space-y-6 max-w-6xl mx-auto">
+      {/* Proctor initialization dialog */}
+      <Dialog open={showProctorDialog} onOpenChange={(open) => {
+        // Don't allow user to close dialog by clicking outside
+        if (!open && !proctorEnabled) return;
+        setShowProctorDialog(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              Exam Proctoring Required
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Important</AlertTitle>
+                <AlertDescription>
+                  This exam requires webcam proctoring to ensure academic integrity.
+                </AlertDescription>
+              </Alert>
+              
+              <p className="text-sm">
+                By continuing, you agree to:
+              </p>
+              
+              <ul className="list-disc pl-5 space-y-1 text-sm">
+                <li>Allow access to your webcam for proctoring purposes</li>
+                <li>Maintain focus on the exam window at all times</li>
+                <li>Understand that looking away from the screen for more than 5 seconds may result in disqualification</li>
+              </ul>
+              
+              <div className="bg-muted/50 p-4 rounded-md">
+                <p className="text-sm font-medium">System requirements:</p>
+                <ul className="list-disc pl-5 space-y-1 text-xs text-muted-foreground">
+                  <li>Functional webcam</li>
+                  <li>Good lighting on your face</li>
+                  <li>Clear view of your face throughout the exam</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => router.push('/dashboard/exams')}>
+              Cancel Exam
+            </Button>
+            <Button onClick={startProctoring}>
+              Accept & Start Exam
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <motion.div 
         initial="hidden"
         animate="visible"
@@ -309,10 +426,32 @@ export default function ExamPage() {
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline">{exam.difficulty}</Badge>
               <Badge>{exam.totalQuestions} Questions</Badge>
+              {proctorEnabled && (
+                <Badge variant="secondary" className="gap-1 flex items-center">
+                  <Eye className="h-3 w-3" />
+                  <span>Proctored</span>
+                </Badge>
+              )}
             </div>
           </div>
           
           <div className="flex items-center gap-4">
+            {/* Toggle proctor video */}
+            {proctorEnabled && (
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setShowProctorVideo(!showProctorVideo)}
+                title={showProctorVideo ? "Hide proctor view" : "Show proctor view"}
+                className="relative"
+              >
+                <Eye className="h-4 w-4" />
+                {showProctorVideo && (
+                  <span className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full"></span>
+                )}
+              </Button>
+            )}
+
             {/* Timer */}
             <div className={`p-2 rounded-md flex items-center gap-2 ${
               timeLeft < 300 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' 
@@ -349,6 +488,28 @@ export default function ExamPage() {
         </div>
         <Progress value={calculateProgress()} className="h-2" />
       </div>
+
+      {/* Webcam proctor panel (conditionally shown) */}
+      {proctorEnabled && showProctorVideo && (
+        <div className="mb-6">
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Proctoring Monitor
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center py-2">
+              <EyeTrackingProctor
+                isActive={proctorEnabled}
+                onCheatingDetected={handleCheatingDetected}
+                showVideo={true}
+                disqualificationThreshold={5} // 5 seconds
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
       {/* Main Question Area */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -593,6 +754,18 @@ export default function ExamPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Hidden proctor */}
+          {proctorEnabled && !showProctorVideo && (
+            <div className="hidden">
+              <EyeTrackingProctor
+                isActive={proctorEnabled}
+                onCheatingDetected={handleCheatingDetected}
+                showVideo={false}
+                disqualificationThreshold={5}
+              />
+            </div>
+          )}
         </div>
         
         {/* Mobile Question Navigator Dialog */}
