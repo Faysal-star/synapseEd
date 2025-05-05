@@ -54,6 +54,7 @@
     "cmdk": "1.0.4",
     "concurrently": "^9.1.2",
     "date-fns": "4.1.0",
+    "@google/generative-ai": "^0.24.0",
     "embla-carousel-react": "8.5.1",
     "face-api.js": "^0.22.2",
     "framer-motion": "latest",

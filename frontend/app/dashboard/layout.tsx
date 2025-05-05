@@ -10,6 +10,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, Brain, LucideIcon, BarChart3, Menu, ChevronLeft, ChevronRight, Layers, Users, PenBox, BookOpenCheck, Cog } from "lucide-react";
+import ChatBot from "@/components/navigation-chatbot";
 
 interface NavItemProps {
   href: string;
@@ -193,6 +194,9 @@ export default function DashboardLayout({
       
       {/* Main content */}
       <div className="flex-1">{children}</div>
+
+      <ChatBot />
+
     </div>
   );
 }

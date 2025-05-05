@@ -5,6 +5,8 @@ import { FeatureSection } from "@/components/feature-section"
 import { CTASection } from "@/components/cta-section"
 import { Footer } from "@/components/footer"
 import { ModeToggle } from "@/components/mode-toggle"
+import ChatBot from "@/components/navigation-chatbot";
+import { Navigation } from "lucide-react"
 
 export default function Home() {
   return (
@@ -37,8 +39,10 @@ export default function Home() {
             </nav>
             <div className="flex items-center gap-4">
               <ModeToggle />
-              <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/30">
-                Get Started
+              <Button  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/30"
+                ><Link href="/dashboard">
+                Go to Dashboard
+                </Link>
               </Button>
             </div>
           </div>
@@ -57,6 +61,8 @@ export default function Home() {
         <FeatureSection />
         <CTASection />
       </main>
+
+      <ChatBot />
 
       <Footer />
     </div>
