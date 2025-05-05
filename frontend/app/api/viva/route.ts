@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Base URL for the Flask backend
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.VIVA_API_URL || 'http://localhost:5006';
 
 // API key for backend authentication - you should set this in your environment variables
 const API_KEY = process.env.VIVA_API_KEY || '';
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
               'Content-Type': 'application/json',
               'Authorization': API_KEY ? `Bearer ${API_KEY}` : '',
               'X-Api-Key': API_KEY || '',
+              'X-Session-ID': crypto.randomUUID(),
               'Origin': process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
             },
             body: JSON.stringify({ subject, topic, difficulty, voice }),
@@ -47,6 +48,18 @@ export async function POST(request: NextRequest) {
           }
 
           const startData = await startResponse.json();
+          
+          // Generate full audio URL
+          if (startData.audio_path) {
+            startData.audio_url = `${BACKEND_URL}${startData.audio_path.startsWith('/') ? '' : '/'}${startData.audio_path}`;
+          }
+          
+          // Set session ID from response or generate one
+          startData.session_id = startData.session_id || startResponse.headers.get('X-Session-ID') || crypto.randomUUID();
+          
+          // Pass greeting from the response
+          startData.text = startData.greeting || 'Hello! I am your VIVA examiner.';
+          
           return NextResponse.json(startData);
         } catch (error) {
           console.error('Error connecting to VIVA backend:', error);
@@ -63,54 +76,117 @@ export async function POST(request: NextRequest) {
         // Process student response
         const sessionId = formData.get('session_id')?.toString();
         
-        // Create a new FormData to send to the backend
-        const backendFormData = new FormData();
-        backendFormData.append('session_id', sessionId || '');
-        
         // Check if audio file is provided
         const audio = formData.get('audio');
         if (audio && audio instanceof Blob) {
-          backendFormData.append('audio', audio);
+          // Process audio response
+          try {
+            // Convert Blob to base64
+            const arrayBuffer = await audio.arrayBuffer();
+            const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+            
+            const chatResponse = await fetch(`${BACKEND_URL}/api/viva/chat`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': API_KEY ? `Bearer ${API_KEY}` : '',
+                'X-Api-Key': API_KEY || '',
+                'X-Session-ID': sessionId || '',
+                'Origin': process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+              },
+              body: JSON.stringify({
+                assistant_id: sessionId,
+                thread_id: sessionId,
+                audio_data: base64Audio
+              }),
+              signal: AbortSignal.timeout(30000), // 30 seconds timeout for audio processing
+            });
+
+            // Log response status for debugging
+            console.log(`VIVA audio chat response status: ${chatResponse.status}`);
+            
+            if (!chatResponse.ok) {
+              const errorText = await chatResponse.text();
+              console.error('Backend error response:', errorText);
+              throw new Error(`Backend returned ${chatResponse.status}: ${errorText || chatResponse.statusText}`);
+            }
+
+            const responseData = await chatResponse.json();
+            
+            // Generate full audio URL
+            if (responseData.audio_path) {
+              responseData.audio_url = `${BACKEND_URL}${responseData.audio_path.startsWith('/') ? '' : '/'}${responseData.audio_path}`;
+            }
+            
+            // Pass response text
+            responseData.text = responseData.response || 'I received your audio response.';
+            
+            return NextResponse.json(responseData);
+          } catch (error) {
+            console.error('Error processing audio response:', error);
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+              return NextResponse.json(
+                { error: 'Could not connect to the VIVA backend server. Please check if the backend is running.' }, 
+                { status: 503 }
+              );
+            }
+            throw error; // Re-throw for the outer catch block
+          }
         } else {
-          // Fallback to text
+          // Process text response
           const text = formData.get('text')?.toString();
-          if (text) {
-            backendFormData.append('text', text);
+          if (!text) {
+            return NextResponse.json({ error: 'No text or audio provided' }, { status: 400 });
           }
-        }
-        
-        try {
-          const respondResponse = await fetch(`${BACKEND_URL}/api/viva/respond`, {
-            method: 'POST',
-            headers: {
-              'Authorization': API_KEY ? `Bearer ${API_KEY}` : '',
-              'X-Api-Key': API_KEY || '',
-              'Origin': process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
-            },
-            body: backendFormData,
-            signal: AbortSignal.timeout(15000), // 15 seconds timeout
-          });
-
-          // Log response status for debugging
-          console.log(`VIVA respond response status: ${respondResponse.status}`);
           
-          if (!respondResponse.ok) {
-            const errorText = await respondResponse.text();
-            console.error('Backend error response:', errorText);
-            throw new Error(`Backend returned ${respondResponse.status}: ${errorText || respondResponse.statusText}`);
-          }
+          try {
+            const chatResponse = await fetch(`${BACKEND_URL}/api/viva/chat`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': API_KEY ? `Bearer ${API_KEY}` : '',
+                'X-Api-Key': API_KEY || '',
+                'X-Session-ID': sessionId || '',
+                'Origin': process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+              },
+              body: JSON.stringify({
+                assistant_id: sessionId,
+                thread_id: sessionId,
+                text: text
+              }),
+              signal: AbortSignal.timeout(15000), // 15 seconds timeout
+            });
 
-          const respondData = await respondResponse.json();
-          return NextResponse.json(respondData);
-        } catch (error) {
-          console.error('Error connecting to VIVA backend:', error);
-          if (error instanceof TypeError && error.message.includes('fetch')) {
-            return NextResponse.json(
-              { error: 'Could not connect to the VIVA backend server. Please check if the backend is running.' }, 
-              { status: 503 }
-            );
+            // Log response status for debugging
+            console.log(`VIVA text chat response status: ${chatResponse.status}`);
+            
+            if (!chatResponse.ok) {
+              const errorText = await chatResponse.text();
+              console.error('Backend error response:', errorText);
+              throw new Error(`Backend returned ${chatResponse.status}: ${errorText || chatResponse.statusText}`);
+            }
+
+            const responseData = await chatResponse.json();
+            
+            // Generate full audio URL
+            if (responseData.audio_path) {
+              responseData.audio_url = `${BACKEND_URL}${responseData.audio_path.startsWith('/') ? '' : '/'}${responseData.audio_path}`;
+            }
+            
+            // Pass response text
+            responseData.text = responseData.response || 'I received your text response.';
+            
+            return NextResponse.json(responseData);
+          } catch (error) {
+            console.error('Error processing text response:', error);
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+              return NextResponse.json(
+                { error: 'Could not connect to the VIVA backend server. Please check if the backend is running.' }, 
+                { status: 503 }
+              );
+            }
+            throw error; // Re-throw for the outer catch block
           }
-          throw error; // Re-throw for the outer catch block
         }
 
       default:
@@ -124,22 +200,57 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Parse the URL to extract path parameters
-    const { searchParams } = new URL(request.url);
+    const { searchParams, pathname } = new URL(request.url);
+    const audio_path = searchParams.get('audio_path');
+    
+    // Check if this is an audio request
+    if (audio_path) {
+      // Remove any leading slash to ensure correct URL construction
+      const audioPathCleaned = audio_path.startsWith('/') ? audio_path.substring(1) : audio_path;
+      
+      // Get the VIVA API URL from environment variables
+      const VIVA_API_URL = process.env.NEXT_PUBLIC_VIVA_API_URL || 'http://localhost:5006';
+      
+      // Construct the full URL to the audio file
+      const audioUrl = `${VIVA_API_URL}/${audioPathCleaned}`;
+      
+      // Make a request to the backend for the audio file
+      const audioResponse = await fetch(audioUrl);
+      
+      if (!audioResponse.ok) {
+        throw new Error(`Failed to fetch audio file: ${audioResponse.status} ${audioResponse.statusText}`);
+      }
+      
+      // Get the audio file as a buffer
+      const audioBuffer = await audioResponse.arrayBuffer();
+      
+      // Return the audio file with the correct content type
+      return new Response(audioBuffer, {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+    }
+    
     const sessionId = searchParams.get('session_id');
     const action = searchParams.get('action');
-
+    
     if (!sessionId) {
       return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
     if (action === 'history') {
-      // Get conversation history
+      // Get conversation history - this is not implemented in the current backend
       try {
-        const historyResponse = await fetch(`${BACKEND_URL}/api/viva/history/${sessionId}`, {
+        const historyResponse = await fetch(`${BACKEND_URL}/api/viva/history`, {
           headers: {
+            'Content-Type': 'application/json',
             'Authorization': API_KEY ? `Bearer ${API_KEY}` : '',
             'X-Api-Key': API_KEY || '',
+            'X-Session-ID': sessionId,
             'Origin': process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
           },
           signal: AbortSignal.timeout(15000), // 15 seconds timeout
@@ -165,6 +276,36 @@ export async function GET(request: NextRequest) {
           );
         }
         throw error; // Re-throw for the outer catch block
+      }
+    }
+    
+    // Check if server is healthy
+    if (action === 'health') {
+      try {
+        // Try to directly access the backend health endpoint
+        const healthResponse = await fetch(`${BACKEND_URL}/api/viva/health`, {
+          signal: AbortSignal.timeout(5000), // 5 seconds timeout
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          },
+        });
+        
+        if (healthResponse.ok) {
+          const healthData = await healthResponse.json();
+          return NextResponse.json(healthData);
+        } else {
+          console.error(`Health check failed: Backend returned ${healthResponse.status}`);
+          return NextResponse.json({ 
+            status: 'unhealthy',
+            message: `Backend server returned ${healthResponse.status}`
+          }, { status: 200 });
+        }
+      } catch (error) {
+        console.error('Health check error:', error);
+        return NextResponse.json({ 
+          status: 'unhealthy',
+          message: error instanceof Error ? error.message : 'Could not connect to backend server'
+        }, { status: 200 });
       }
     }
     

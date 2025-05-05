@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Brain, LucideIcon, BarChart3, Menu, ChevronLeft, ChevronRight, Layers, Users, PenBox, BookOpenCheck, Cog } from "lucide-react";
+import { BookOpen, Brain, LucideIcon, BarChart3, Menu, ChevronLeft, ChevronRight, Layers, Users, PenBox, BookOpenCheck, Cog, SpeechIcon } from "lucide-react";
 import ChatBot from "@/components/navigation-chatbot";
 
 interface NavItemProps {
@@ -48,6 +48,7 @@ const studentNavItems = [
   { href: "/dashboard/class-resources", icon: BookOpen, title: "Class Resources" },
   { href: "/dashboard/ai-agents", icon: Brain, title: "AI Agents" },
   { href: "/dashboard/exams", icon: BookOpenCheck, title: "Exams" },
+  { href: "/dashboard/viva", icon: SpeechIcon, title: "Viva Trainer" },
   { href: "/dashboard/ai-counselor", icon: Users, title: "AI Counselor" },
   { href: "/dashboard/whiteboard", icon: PenBox, title: "Whiteboard" },
   { href: "/dashboard/settings", icon: Cog, title: "Settings" },

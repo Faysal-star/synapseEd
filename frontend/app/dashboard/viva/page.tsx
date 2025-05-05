@@ -1,10 +1,13 @@
-import { Suspense } from 'react';
-import  VivaPage  from '@/components/dashboard_pages/viva/VivaPage';
+'use client';
 
-export default function VivaRoute() {
+import React from 'react';
+import VivaPage from '@/components/dashboard_pages/viva/VivaPage';
+
+
+export default function VivaPage_() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <div>
       <VivaPage />
-    </Suspense>
+    </div>
   );
 }

@@ -19,3 +19,7 @@ werkzeug
 sentence-transformers
 typing-extensions
 numpy
+openai
+requests
+python-multipart
+gunicorn

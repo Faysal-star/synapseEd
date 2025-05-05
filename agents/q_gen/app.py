@@ -10,7 +10,10 @@ from pdf_processor import PDFProcessor
 from vector_store import VectorStoreManager
 from llm_factory import LLMFactory
 from question_gen_agent import QuestionGenerationSystem
-from viva_gen import VivaAgent
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
