@@ -16,6 +16,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import QuestionGenerationPage from '@/components/dashboard_pages/ai_agents/question_generation/page';
 import WebSearchPage from '@/components/dashboard_pages/ai_agents/web_search/page';
+import LecturePlannerPage from '@/components/dashboard_pages/ai_agents/lecture_planner/page';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -70,6 +71,9 @@ export default function AIAgentsPage() {
   const [feedbackMessageId, setFeedbackMessageId] = useState<string | null>(null);
   const [initialRating, setInitialRating] = useState<number>(3);
   const [conversationId, setConversationId] = useState<string>('');
+
+  // Inside the component, add a state for lecture planner
+  const [showLecturePlanner, setShowLecturePlanner] = useState(false);
 
   // Create form
   const form = useForm<FeedbackFormValues>({
@@ -136,6 +140,7 @@ export default function AIAgentsPage() {
     // Reset UI state when agent changes
     setShowQuestionGenerator(false);
     setShowWebSearch(false);
+    setShowLecturePlanner(false);
   }, [activeAgent]);
 
   // Get welcome message based on agent
@@ -377,6 +382,10 @@ export default function AIAgentsPage() {
       ) : showWebSearch && activeAgent === 'web-search' ? (
         <div className="flex-1 overflow-y-auto">
           <WebSearchPage />
+        </div>
+      ) : showLecturePlanner && activeAgent === 'lecture-planner' ? (
+        <div className="flex-1 overflow-y-auto">
+          <LecturePlannerPage />
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
@@ -864,24 +873,47 @@ export default function AIAgentsPage() {
               {activeAgent === 'lecture-planner' && (
                 <div className="space-y-3">
                   {/* Lecture Planner section */}
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowLecturePlanner(true)}
+                  >
                     <CardContent className="p-3">
-                      <h4 className="font-medium text-sm">Create lesson structure</h4>
-                      <p className="text-xs text-muted-foreground">Design organized lesson outlines</p>
+                      <h4 className="font-medium text-sm">Create New Lecture Plan</h4>
+                      <p className="text-xs text-muted-foreground">Generate complete lesson plans</p>
                     </CardContent>
                   </Card>
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowLecturePlanner(true)}
+                  >
                     <CardContent className="p-3">
-                      <h4 className="font-medium text-sm">Activity planning</h4>
-                      <p className="text-xs text-muted-foreground">Design engaging classroom activities</p>
+                      <h4 className="font-medium text-sm">Edit Existing Plans</h4>
+                      <p className="text-xs text-muted-foreground">Modify and improve your lecture plans</p>
                     </CardContent>
                   </Card>
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowLecturePlanner(true)}
+                  >
                     <CardContent className="p-3">
-                      <h4 className="font-medium text-sm">Curriculum mapping</h4>
-                      <p className="text-xs text-muted-foreground">Plan across multiple lessons or units</p>
+                      <h4 className="font-medium text-sm">API-Powered Planning</h4>
+                      <p className="text-xs text-muted-foreground">Use our API for advanced features</p>
                     </CardContent>
                   </Card>
+                  
+                  {/* Launch lecture planner button */}
+                  <div className="mt-6">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setShowLecturePlanner(true)}
+                    >
+                      <SquarePen className="mr-2 h-4 w-4" />
+                      Launch Lecture Planner
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Use the full interface for better results
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
