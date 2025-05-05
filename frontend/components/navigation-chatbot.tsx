@@ -8,14 +8,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   MessageCircle, 
   Send, 
-  X, 
   Bot, 
   ChevronLeft,
-  ChevronRight,
   HelpCircle,
   Loader2,
   ArrowRight,
-  User
+  User,
+  Sparkles,
+  Brain,
+  Search,
+  MapPin
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -24,6 +26,14 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   isTyping?: boolean;
+  isThinking?: boolean; // Add this to differentiate between typing and thinking
+}
+
+// Function to detect Bengali text
+function isBengali(text: string): boolean {
+  // Bengali Unicode range: \u0980-\u09FF
+  const bengaliPattern = /[\u0980-\u09FF]/;
+  return bengaliPattern.test(text);
 }
 
 export default function ChatBot() {
@@ -40,6 +50,7 @@ export default function ChatBot() {
   const [visibleContent, setVisibleContent] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [isBengaliQuery, setIsBengaliQuery] = useState(false);
 
   useEffect(() => {
     // Auto-scroll to the bottom when messages change
@@ -52,7 +63,7 @@ export default function ChatBot() {
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     
-    if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isTyping) {
+    if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isTyping && !lastMessage.isThinking) {
       setIsTyping(true);
       setVisibleContent('');
       setCurrentMessageIndex(0);
@@ -87,6 +98,7 @@ export default function ChatBot() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
+    setIsBengaliQuery(isBengali(e.target.value));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -94,17 +106,22 @@ export default function ChatBot() {
     
     if (!input.trim()) return;
     
+    // Check if input is Bengali
+    const bengaliInput = isBengali(input);
+    setIsBengaliQuery(bengaliInput);
+    
     // Add user message to chat
     const userMessage = { role: 'user' as const, content: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
     
-    // Add a temporary "thinking" message
+    // Add a temporary "thinking" message with empty content and isThinking flag
     setMessages(prev => [...prev, { 
       role: 'assistant', 
-      content: 'Thinking...', 
-      isTyping: true 
+      content: '', // Empty content for the ThinkingAnimation
+      isTyping: false, // Not in typing state yet
+      isThinking: true // In thinking state
     }]);
     
     try {
@@ -123,12 +140,22 @@ export default function ChatBot() {
       if (data.error) {
         setMessages(prev => [
           ...prev.slice(0, -1), 
-          { role: 'assistant', content: `Error: ${data.error}`, isTyping: true }
+          { 
+            role: 'assistant', 
+            content: `Error: ${data.error}`, 
+            isTyping: true,
+            isThinking: false
+          }
         ]);
       } else {
         setMessages(prev => [
           ...prev.slice(0, -1), 
-          { role: 'assistant', content: data.response, isTyping: true }
+          { 
+            role: 'assistant', 
+            content: data.response, 
+            isTyping: true,
+            isThinking: false
+          }
         ]);
         
         // Check if navigation is required
@@ -143,11 +170,94 @@ export default function ChatBot() {
       console.error('Error calling navigation agent:', error);
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', isTyping: true }
+        { 
+          role: 'assistant', 
+          content: bengaliInput 
+            ? 'দুঃখিত, একটি ত্রুটি হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।' 
+            : 'Sorry, I encountered an error. Please try again.', 
+          isTyping: true,
+          isThinking: false
+        }
       ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Animation elements for the thinking state
+  const ThinkingAnimation = () => {
+    const icons = [Brain, Search, MapPin, Sparkles];
+    const [activeIcon, setActiveIcon] = useState(0);
+    
+    // Cycle through icons
+    useEffect(() => {
+      const interval = setInterval(() => {
+        setActiveIcon((prev) => (prev + 1) % icons.length);
+      }, 1000);
+      return () => clearInterval(interval);
+    }, []);
+    
+    const CurrentIcon = icons[activeIcon];
+    
+    const thinkingPhrases = isBengaliQuery ? [
+      "আপনার জন্য উত্তর খুঁজছি...",
+      "সবচেয়ে ভালো পথ খুঁজছি...",
+      "SynapseEd নেভিগেট করছি...",
+      "আপনার রেসপন্স রেডি করছি..."
+    ] : [
+      "Searching for the right place...",
+      "Finding the best path...",
+      "Navigating SynapseED...",
+      "Mapping your destination..."
+    ];
+
+    return (
+      <div className="flex flex-col items-center space-y-2 w-full py-2">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            rotate: [0, 5, -5, 0]
+          }}
+          transition={{ 
+            repeat: Infinity, 
+            duration: 2,
+            ease: "easeInOut"
+          }}
+          className="relative"
+        >
+          <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-md animate-pulse"></div>
+          <div className="w-10 h-10 relative bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
+            <CurrentIcon size={20} className="text-white" />
+          </div>
+        </motion.div>
+        
+        <motion.div 
+          className="text-sm text-center font-medium text-gray-600 dark:text-gray-300"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.5 }}
+        >
+          {thinkingPhrases[activeIcon]}
+        </motion.div>
+        
+        <div className="flex items-center justify-center space-x-1.5 mt-1">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600"
+              animate={{
+                scale: [0.8, 1.2, 0.8],
+                opacity: [0.5, 1, 0.5],
+              }}
+              transition={{
+                repeat: Infinity,
+                duration: 1,
+                delay: i * 0.2,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -238,16 +348,10 @@ export default function ChatBot() {
                             }
                           `}
                         >
-                          {message.role === 'assistant' && message.isTyping && index === messages.length - 1 ? (
-                            <>
-                              {visibleContent || (
-                                <div className="flex items-center gap-1">
-                                  <div className="animate-bounce h-2 w-2 bg-current rounded-full" style={{ animationDelay: '0ms' }}></div>
-                                  <div className="animate-bounce h-2 w-2 bg-current rounded-full" style={{ animationDelay: '150ms' }}></div>
-                                  <div className="animate-bounce h-2 w-2 bg-current rounded-full" style={{ animationDelay: '300ms' }}></div>
-                                </div>
-                              )}
-                            </>
+                          {message.role === 'assistant' && message.isThinking ? (
+                            <ThinkingAnimation />
+                          ) : message.role === 'assistant' && message.isTyping ? (
+                            visibleContent
                           ) : (
                             message.content
                           )}
@@ -268,7 +372,7 @@ export default function ChatBot() {
               <CardFooter className="border-t p-3 bg-background">
                 <form onSubmit={handleSubmit} className="flex w-full gap-2">
                   <Input
-                    placeholder="Ask me anything..."
+                    placeholder={isBengaliQuery ? "আপনার প্রশ্ন লিখুন..." : "Ask me anything..."}
                     value={input}
                     onChange={handleInputChange}
                     disabled={isLoading}
