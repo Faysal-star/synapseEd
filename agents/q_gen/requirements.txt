@@ -5,8 +5,17 @@ langchain
 langchain-community
 langchain-openai
 langchain-google-genai
+langchain_groq
 langchain-text-splitters
 langgraph
 pymupdf
 python-dotenv
 faiss-cpu
+tavily-python
+wikipedia
+arxiv
+flask-restx
+werkzeug
+sentence-transformers
+typing-extensions
+numpy
