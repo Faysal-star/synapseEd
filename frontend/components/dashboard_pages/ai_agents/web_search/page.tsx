@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Search, SendHorizontal, ThumbsUp, ThumbsDown, Info, MoveLeft, Brain, Check } from "lucide-react";
+import { Search, SendHorizontal, ThumbsUp, ThumbsDown, Info, MoveLeft, Brain, Check, Globe, ExternalLink, FileText, Book, Image, Video, ChevronRight } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -32,6 +32,7 @@ interface Message {
   reasoning?: ReasoningStep[];
   isError?: boolean;
   hasFeedback?: boolean; // Track if feedback was given
+  searched_websites?: string[]; // Add this field for websites
 }
 
 interface ReasoningStep {
@@ -97,6 +98,9 @@ export default function WebSearchPage() {
     setMessages([initialMessage]);
   }, []);
 
+  // Add state to track the current message whose sources are being shown
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
@@ -137,17 +141,21 @@ export default function WebSearchPage() {
       
       const data = await response.json();
       
-      // Add assistant message
+      // Add assistant message with searched_websites
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.response,
         timestamp: new Date(),
         messageId: data.message_id,
-        reasoning: data.reasoning
+        reasoning: data.reasoning,
+        searched_websites: data.searched_websites || [] // Store searched websites
       };
       
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Set this message as active to show its sources in the sidebar
+      setActiveMessageId(assistantMessage.id);
       
       // Update conversation ID if this is the first message
       if (!conversationId || conversationId.startsWith('websearch-')) {
@@ -283,6 +291,50 @@ export default function WebSearchPage() {
     }
   };
 
+  // Helper function to get website icon based on URL
+  const getWebsiteIcon = (url: string) => {
+    if (url.includes('wikipedia.org')) return <Book className="h-4 w-4" />;
+    if (url.includes('khanacademy.org')) return <FileText className="h-4 w-4" />;
+    if (url.includes('youtube.com') || url.includes('vimeo.com')) return <Video className="h-4 w-4" />;
+    if (url.includes('flickr.com') || url.includes('.jpg') || url.includes('.png')) return <Image className="h-4 w-4" />;
+    return <Globe className="h-4 w-4" />;
+  };
+
+  // Helper function to get domain name from URL
+  const getDomainName = (url: string) => {
+    try {
+      const domain = new URL(url).hostname.replace('www.', '');
+      return domain;
+    } catch (error) {
+      return url;
+    }
+  };
+
+  // Helper function to get page title from URL
+  const getPageTitle = (url: string) => {
+    const domain = getDomainName(url);
+    
+    // Extract the last path segment as title if available
+    try {
+      const pathSegments = new URL(url).pathname.split('/').filter(Boolean);
+      if (pathSegments.length > 0) {
+        const lastSegment = pathSegments[pathSegments.length - 1]
+          .replace(/-/g, ' ')
+          .replace(/_/g, ' ')
+          .replace(/\.[^/.]+$/, '') // Remove file extension
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        
+        if (lastSegment) return lastSegment;
+      }
+    } catch (error) {
+      // Fallback to domain
+    }
+    
+    return domain;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -357,6 +409,27 @@ export default function WebSearchPage() {
                       
                       {message.role === 'assistant' && message.messageId && !message.isError && (
                         <div className="flex items-center space-x-2">
+                          {/* Add Sources button if we have searched websites */}
+                          {message.searched_websites && message.searched_websites.length > 0 && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6"
+                                    onClick={() => setActiveMessageId(activeMessageId === message.id ? null : message.id)}
+                                  >
+                                    <Globe className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Show sources</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          
                           {message.reasoning && message.reasoning.length > 0 && (
                             <TooltipProvider>
                               <Tooltip>
@@ -499,11 +572,75 @@ export default function WebSearchPage() {
           </div>
         </div>
 
+        {/* Website Sources Sidebar - conditionally rendered */}
+        {activeMessageId && (
+          <div className="w-80 border-l bg-slate-50 dark:bg-slate-900/30 flex flex-col">
+            <div className="p-4 border-b">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold">Sources</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setActiveMessageId(null)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+            
+            <ScrollArea className="flex-1">
+              <div className="p-4">
+                <div className="space-y-2">
+                  {(() => {
+                    // Find the active message
+                    const activeMessage = messages.find(msg => msg.id === activeMessageId);
+                    if (!activeMessage || !activeMessage.searched_websites || activeMessage.searched_websites.length === 0) {
+                      return (
+                        <div className="text-sm text-muted-foreground p-3">
+                          No sources available for this response.
+                        </div>
+                      );
+                    }
+                    
+                    return activeMessage.searched_websites.map((website, idx) => (
+                      <Card key={idx} className="overflow-hidden hover:bg-accent transition-colors">
+                        <a 
+                          href={website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block"
+                        >
+                          <CardContent className="p-3 flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="p-2 bg-accent rounded-full">
+                                {getWebsiteIcon(website)}
+                              </div>
+                              <div>
+                                <h4 className="font-medium text-sm truncate max-w-[180px]">
+                                  {getPageTitle(website)}
+                                </h4>
+                                <p className="text-xs text-muted-foreground truncate max-w-[180px]">
+                                  {getDomainName(website)}
+                                </p>
+                              </div>
+                            </div>
+                            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                          </CardContent>
+                        </a>
+                      </Card>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
         {/* Memory stats sidebar - conditionally rendered */}
         {showMemoryStats && (
-          <div className="w-80 border-l">
-            <div className="p-4">
-              <div className="flex justify-between items-center mb-4">
+          <div className="w-80 border-l flex flex-col">
+            <div className="p-4 border-b">
+              <div className="flex justify-between items-center">
                 <h3 className="font-semibold">Memory Statistics</h3>
                 <Button 
                   variant="ghost" 
@@ -513,65 +650,69 @@ export default function WebSearchPage() {
                   ✕
                 </Button>
               </div>
-              
-              {memoryStats ? (
-                <div className="space-y-4">
-                  <Card>
-                    <CardContent className="p-3">
-                      <h4 className="font-medium text-sm mb-2">Conversation Summary</h4>
-                      <div className="space-y-1 text-xs">
-                        <p><span className="font-medium">Main memory:</span> {memoryStats.main_memory_size} exchanges</p>
-                        <p><span className="font-medium">External memory:</span> {memoryStats.external_memory_size} exchanges</p>
-                        <p><span className="font-medium">Attention sinks:</span> {memoryStats.attention_sinks} items</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  {memoryStats.topics.length > 0 && (
-                    <Card>
-                      <CardContent className="p-3">
-                        <h4 className="font-medium text-sm mb-2">Knowledge Topics</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {memoryStats.topics.map((topic, idx) => (
-                            <span 
-                              key={idx}
-                              className="text-xs bg-accent px-2 py-1 rounded-full"
-                            >
-                              {topic}
-                            </span>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                  
-                  {Object.keys(memoryStats.user_profile).length > 0 && (
-                    <Card>
-                      <CardContent className="p-3">
-                        <h4 className="font-medium text-sm mb-2">User Profile</h4>
-                        <div className="space-y-1 text-xs">
-                          {Object.entries(memoryStats.user_profile).map(([key, value], idx) => (
-                            <p key={idx}>
-                              <span className="font-medium">{key.replace(/_/g, ' ')}:</span> {
-                                Array.isArray(value) 
-                                  ? value.join(', ') 
-                                  : String(value)
-                              }
-                            </p>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-32 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              )}
             </div>
+            
+            <ScrollArea className="flex-1">
+              <div className="p-4">
+                {memoryStats ? (
+                  <div className="space-y-4">
+                    <Card>
+                      <CardContent className="p-3">
+                        <h4 className="font-medium text-sm mb-2">Conversation Summary</h4>
+                        <div className="space-y-1 text-xs">
+                          <p><span className="font-medium">Main memory:</span> {memoryStats.main_memory_size} exchanges</p>
+                          <p><span className="font-medium">External memory:</span> {memoryStats.external_memory_size} exchanges</p>
+                          <p><span className="font-medium">Attention sinks:</span> {memoryStats.attention_sinks} items</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    {memoryStats.topics.length > 0 && (
+                      <Card>
+                        <CardContent className="p-3">
+                          <h4 className="font-medium text-sm mb-2">Knowledge Topics</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {memoryStats.topics.map((topic, idx) => (
+                              <span 
+                                key={idx}
+                                className="text-xs bg-accent px-2 py-1 rounded-full"
+                              >
+                                {topic}
+                              </span>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {Object.keys(memoryStats.user_profile).length > 0 && (
+                      <Card>
+                        <CardContent className="p-3">
+                          <h4 className="font-medium text-sm mb-2">User Profile</h4>
+                          <div className="space-y-1 text-xs">
+                            {Object.entries(memoryStats.user_profile).map(([key, value], idx) => (
+                              <p key={idx}>
+                                <span className="font-medium">{key.replace(/_/g, ' ')}:</span> {
+                                  Array.isArray(value) 
+                                    ? value.join(', ') 
+                                    : String(value)
+                                }
+                              </p>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
           </div>
         )}
       </div>
