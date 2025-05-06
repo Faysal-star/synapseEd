@@ -1,16 +1,242 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../lib/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+// User model is not needed as it is handled by the authentication provider
+// and the profile model is used for user information.
+
+// Profile model based on the signup database action
+model Profile {
+  id            String    @id
+  name          String
+  email         String    @unique
+  role          String    @default("student")
+  avatarUrl     String?   @map("avatar_url")
+  bio           String?
+  institution   String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  examResults   ExamResult[]
+  examsCreated  Exam[]
+  examsTaken    Exam[]    @relation("ExamsTaken")
+  courses       Course[]  @relation("CourseStudents")
+  coursesTeaching Course[] @relation("CourseTeachers")
+  resources     Resource[]
+  lecturePlans  LecturePlan[]
+  feedbacks     Feedback[]
+  disqualifications Disqualification[]
+  
+  @@map("profiles")
+}
+
+model Course {
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  resources   Resource[]
+  exams       Exam[]
+  lecturePlans LecturePlan[]
+  feedbacks   Feedback[]
+  teachers    Profile[] @relation("CourseTeachers")
+  students    Profile[] @relation("CourseStudents")
+  
+  @@map("courses")
+}
+
+model Topic {
+  id          String    @id @default(uuid())
+  name        String
+  description String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  resources   Resource[]
+  exams       Exam[]    @relation("TopicExams")
+  
+  @@map("topics")
+}
+
+// Exam model based on the Exam interface
+model Exam {
+  id              String      @id @default(uuid())
+  title           String
+  description     String
+  duration        Int         // in minutes
+  difficulty      String
+  subject         String      // Added subject property
+  topic           String      // Added topic property as a string field
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  createdById     String      @map("created_by_id")
+  courseId        String?     @map("course_id")
+  topicId         String?     @map("topic_id")
+  
+  // Relations
+  questions       Question[]
+  examResults     ExamResult[]
+  createdBy       Profile     @relation(fields: [createdById], references: [id])
+  course          Course?     @relation(fields: [courseId], references: [id])
+  topicRelation   Topic?      @relation("TopicExams", fields: [topicId], references: [id])
+  participants    Profile[]   @relation("ExamsTaken")
+  disqualifications Disqualification[]
+  resources       Resource[]
+  
+  @@map("exams")
+}
+
+// Question model based on the ExamQuestion interface
+model Question {
+  id           String       @id @default(uuid())
+  question     String
+  options      Json         // Stores the options as a JSON object
+  answer       String
+  hints        String[]
+  difficulty   QuestionDifficulty
+  category     String?
+  examId       String       @map("exam_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // Relations
+  exam         Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers      Answer[]
+  
+  @@map("questions")
+}
+
+// ExamResult model based on the ExamResult interface
+model ExamResult {
+  id             String       @id @default(uuid())
+  userId         String       @map("user_id")
+  examId         String       @map("exam_id")
+  timeRemaining  Int
+  totalTime      Int
+  submittedAt    DateTime     @default(now()) @map("submitted_at")
+  finalScore     Float?
+  rawScore       Float?
+  totalPenalty   Int?
+  
+  // Relations
+  user           Profile      @relation(fields: [userId], references: [id])
+  exam           Exam         @relation(fields: [examId], references: [id])
+  answers        Answer[]
+  
+  @@map("exam_results")
+}
+
+// Answer model based on the AnswerState interface
+model Answer {
+  id             String       @id @default(uuid())
+  examResultId   String       @map("exam_result_id")
+  questionId     String       @map("question_id")
+  selectedOption String?
+  hintsUsed      Int          @default(0)
+  flagged        Boolean      @default(false)
+  timeSpent      Int          @default(0) // in seconds
+  
+  // Relations
+  examResult     ExamResult   @relation(fields: [examResultId], references: [id], onDelete: Cascade)
+  question       Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@unique([examResultId, questionId])
+  @@map("answers")
+}
+
+// Disqualification model to track exam disqualifications
+model Disqualification {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  examId      String    @map("exam_id")
+  reason      String
+  timestamp   DateTime  @default(now())
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  user        Profile   @relation(fields: [userId], references: [id])
+  exam        Exam      @relation(fields: [examId], references: [id])
+  
+  @@map("disqualifications")
+}
+
+// Resource model for educational resources
+model Resource {
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  fileUrl     String    @map("file_url")
+  fileType    String    @map("file_type")
+  uploadedById String    @map("uploaded_by")
+  courseId    String?   @map("course_id")
+  examId      String?   @map("exam_id")
+  topicId     String?   @map("topic_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  uploadedBy  Profile   @relation(fields: [uploadedById], references: [id])
+  course      Course?   @relation(fields: [courseId], references: [id])
+  exam        Exam?     @relation(fields: [examId], references: [id])
+  topic       Topic?    @relation(fields: [topicId], references: [id])
+  
+  @@map("resources")
+}
+
+// Lecture Plan model for lecture planning agent
+model LecturePlan {
+  id          String    @id @default(uuid())
+  title       String
+  subject     String
+  topic       String
+  content     Json      // Stores structured lecture content
+  duration    Int       // in minutes
+  createdById String    @map("created_by")
+  courseId    String?   @map("course_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  createdBy   Profile   @relation(fields: [createdById], references: [id])
+  course      Course?   @relation(fields: [courseId], references: [id])
+  
+  @@map("lecture_plans")
+}
+
+// Feedback model for user feedback
+model Feedback {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  content     String
+  rating      Int
+  courseId    String?   @map("course_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  // Relations
+  user        Profile   @relation(fields: [userId], references: [id])
+  course      Course?   @relation(fields: [courseId], references: [id])
+  
+  @@map("feedback")
+}
+
+// Enum for Question Difficulty
+enum QuestionDifficulty {
+  Easy
+  Medium
+  Hard
 }
