@@ -63,16 +63,26 @@ export default function ResourceManagementPage() {
     fetchResources();
   }, [fetchResources]);
 
+  // Select first course by default
+  useEffect(() => {
+    if (resources.length > 0) {
+      const firstCourse = resources.find(item => item.type === 'folder');
+      if (firstCourse) {
+        navigateToFolder([firstCourse.path]);
+      }
+    }
+  }, [resources]);
+
   // Get current folder resources based on path
   const getCurrentResources = useCallback(() => {
     if (currentPath.length === 0) {
       // At root level, show only courses (folders)
-      return resources.filter(item => item.path.length === 1);
+      return resources.filter(item => item.type === 'folder');
     }
     // Inside a course, show files for that course
-    return resources.filter(item =>
-      item.path[0] === currentPath[0] && // Same course
-      item.path.length === currentPath.length + 1 // Direct children only
+    return resources.filter(item => 
+      item.type !== 'folder' && // Only files
+      item.path.startsWith(currentPath[0]) // Files in current course
     );
   }, [resources, currentPath]);
 
@@ -159,7 +169,6 @@ export default function ResourceManagementPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-      
       const newCourse = await createCourse(newFolderName, user.id);
       setResources(prev => [...prev, newCourse]);
       setNewFolderName('');
@@ -225,10 +234,12 @@ export default function ResourceManagementPage() {
     }
   };
 
-  // File dropzone for upload
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  // Toolbar dropzone for upload
+  const { getRootProps: getToolbarRootProps, getInputProps: getToolbarInputProps, isDragActive: isToolbarDragActive } = useDropzone({
+    noClick: false,
     onDrop: async (acceptedFiles) => {
       try {
+        setLoading(true);
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         
@@ -244,9 +255,45 @@ export default function ResourceManagementPage() {
         }
 
         await fetchResources();
+        console.log('Files uploaded successfully');
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to upload files';
+        console.error(errorMessage); // TODO: Replace with proper toast notification system
         console.error('Error uploading files:', err);
-        // Show error toast or notification
+      } finally {
+        setLoading(false);
+      }
+    },
+  });
+
+  // Empty state dropzone for upload
+  const { getRootProps: getEmptyStateRootProps, getInputProps: getEmptyStateInputProps, isDragActive: isEmptyStateDragActive } = useDropzone({
+    noClick: false,
+    onDrop: async (acceptedFiles) => {
+      try {
+        setLoading(true);
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!currentPath[0]) {
+          throw new Error('Please select a course before uploading files');
+        }
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        for (const file of acceptedFiles) {
+          await uploadFile(file, currentPath[0], user.id, currentPath);
+        }
+
+        await fetchResources();
+        console.log('Files uploaded successfully');
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to upload files';
+        console.error(errorMessage); // TODO: Replace with proper toast notification system
+        console.error('Error uploading files:', err);
+      } finally {
+        setLoading(false);
       }
     },
   });
@@ -288,43 +335,56 @@ export default function ResourceManagementPage() {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Top bar with actions */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="p-4 space-y-4">
-          {/* create a new course */}
-          <Button
-            className="w-full justify-start gap-2"
-            size="sm"
-            onClick={() => setShowCreateFolderDialog(true)}  // Open dialog when clicked
-          >
-            <Plus className="h-4 w-4" />
-            New
-          </Button>
-          
-          <Separator />
-          
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground px-2">COURSES</p>
-            {['CSE 101', 'HUM 102', 'MATH 203', 'PHY 101'].map(course => (
+    <div className="h-full flex">
+      {/* Left sidebar */}
+      <div className="w-64 border-r bg-background p-4 flex flex-col">
+        <Button
+          className="w-full justify-start gap-2 mb-4"
+          size="sm"
+          onClick={() => setShowCreateFolderDialog(true)}
+        >
+          <Plus className="h-4 w-4" />
+          New
+        </Button>
+
+        <Separator className="mb-4" />
+
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground px-2">COURSES</p>
+          {resources
+            .filter(item => item.type === 'folder')
+            .map(course => (
               <Button
-                key={course}
+                key={course.id}
                 variant="ghost"
-                className="w-full justify-start gap-2 truncate"
+                className={cn(
+                  "w-full justify-start gap-2 truncate",
+                  currentPath[0] === course.path && "bg-accent"
+                )}
                 size="sm"
-                onClick={() => alert(`Navigating to ${course}`)} // Replace with actual navigation logic
+                onClick={() => navigateToFolder([course.path])}
               >
                 <Folder className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                <span className="truncate">{course}</span>
-                {/* You can add a star icon if necessary */}
-                <Star className="h-3 w-3 ml-auto text-yellow-500 flex-shrink-0" />
+                <span className="truncate">{course.name}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleStar(course.id.toString());
+                  }}
+                  className="ml-auto"
+                >
+                  <Star
+                    className={cn(
+                      "h-3 w-3",
+                      course.starred ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
+                    )}
+                  />
+                </button>
               </Button>
             ))}
-          </div>
-
         </div>
-        
-        <div className="mt-auto p-4">
+
+        <div className="mt-auto">
           <div className="bg-primary/10 p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">Storage</p>
@@ -409,11 +469,12 @@ export default function ResourceManagementPage() {
             variant="ghost"
             size="sm"
             className="gap-2"
-            {...getRootProps()}
+            disabled={currentPath.length === 0}
+            {...getToolbarRootProps()}
           >
             <Upload className="h-4 w-4" />
             Upload Files
-            <input {...getInputProps()} />
+            <input {...getToolbarInputProps()} />
           </Button>
           
           <Separator orientation="vertical" className="h-6" />
@@ -449,9 +510,9 @@ export default function ResourceManagementPage() {
             Share
           </Button>
         </div>
-        
-        {/* Dropzone area (active during drag) */}
-        {isDragActive && (
+
+        {/* Rest of the content */}
+        {(isToolbarDragActive || isEmptyStateDragActive) && (
           <div className="absolute inset-0 z-50 bg-background/95 flex items-center justify-center border-2 border-dashed border-primary">
             <div className="text-center p-10 rounded-lg">
               <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
@@ -475,14 +536,10 @@ export default function ResourceManagementPage() {
                   {searchQuery ? 'No items match your search.' : 'Upload files or create folders to get started.'}
                 </p>
                 <div className="mt-4 space-x-2">
-                  <Button variant="outline" size="sm" onClick={() => setShowCreateFolderDialog(true)}>
-                    <FolderPlus className="h-4 w-4 mr-2" />
-                    New Folder
-                  </Button>
-                  <Button variant="outline" size="sm" {...getRootProps()}>
+                  <Button variant="outline" size="sm" {...getEmptyStateRootProps()}>
                     <Upload className="h-4 w-4 mr-2" />
                     Upload Files
-                    <input {...getInputProps()} />
+                    <input {...getEmptyStateInputProps()} />
                   </Button>
                 </div>
               </div>
