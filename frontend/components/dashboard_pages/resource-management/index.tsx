@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,69 +12,23 @@ import { cn } from "@/lib/utils";
 import { useDropzone } from 'react-dropzone';
 import { motion } from "framer-motion";
 import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileAudio, FileVideo, MoreHorizontal, Trash, Download, Edit, Share2, Plus, Upload, Search, Folder, FolderPlus, X, Clock, Grid3X3, List, Info, Star } from "lucide-react";
+import { createClient } from '@/utils/supabase/client';
 
 // Types
 type FileType = 'folder' | 'pdf' | 'doc' | 'image' | 'archive' | 'audio' | 'video' | 'other';
 
-interface Resource {
-  id: number;
-  course_id: number;
-  user_id: string;
-  name: string;
-  path: string;
-  size: number | null;
-  type: string;
-  starred: boolean;
-  modifiedDate: string;
-}
+import { 
+  Resource,
+  fetchAllResources,
+  createCourse,
+  updateCourseStarred,
+  deleteCourse,
+  deleteFile,
+  uploadFile,
+  downloadFile
+} from '@/app/lib/resource-management';
 
-const rscrs: Resource[] = [
-  {
-    id: 1,
-    course_id: 101,
-    user_id: "uuid-123",
-    name: "Lecture Notes",
-    path: "/files/notes.pdf",
-    size: 204800,
-    type: "pdf",
-    starred: true,
-    modifiedDate: "2023-08-20T10:30:00Z",
-  },
-  {
-    id: 2,
-    course_id: 101,
-    user_id: "uuid-123",
-    name: "Diagram.png",
-    path: "/files/diagram.png",
-    size: 512000,
-    type: "image",
-    starred: false,
-    modifiedDate: "2023-08-20T10:30:00Z",
-  },
-  {
-    id: 3,
-    course_id: 102,
-    user_id: "uuid-234",
-    name: "Project.mp4",
-    path: "/files/project.mp4",
-    size: 10485760,
-    type: "video",
-    starred: false,
-    modifiedDate: "2023-08-20T10:30:00Z",
-  },
-  {
-    id: 4,
-    course_id: 103,
-    user_id: "uuid-345",
-    name: "Course Materials",
-    path: "/files/folder1/",
-    size: null,
-    type: "folder",
-    starred: true,
-    modifiedDate: "2023-08-20T10:30:00Z",
-  },
-];
-
+// Remove the Resource interface and FileType type as they're now imported
 
 export default function ResourceManagementPage() {
   const [currentPath, setCurrentPath] = useState<string[]>([]);
@@ -86,11 +40,41 @@ export default function ResourceManagementPage() {
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showDetails, setShowDetails] = useState(false);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
+  // Fetch resources from Supabase
+  const fetchResources = useCallback(async () => {
+    try {
+      setLoading(true);
+      const resources = await fetchAllResources();
+      setResources(resources);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch resources');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch resources on component mount
+  useEffect(() => {
+    fetchResources();
+  }, [fetchResources]);
+
   // Get current folder resources based on path
   const getCurrentResources = useCallback(() => {
-    return rscrs;
-  }, []);
+    if (currentPath.length === 0) {
+      // At root level, show only courses (folders)
+      return resources.filter(item => item.path.length === 1);
+    }
+    // Inside a course, show files for that course
+    return resources.filter(item =>
+      item.path[0] === currentPath[0] && // Same course
+      item.path.length === currentPath.length + 1 // Direct children only
+    );
+  }, [resources, currentPath]);
 
   // Filtered and sorted resources
   const filteredResources = getCurrentResources().filter(item => 
@@ -106,7 +90,7 @@ export default function ResourceManagementPage() {
         ? a.name.localeCompare(b.name)
         : b.name.localeCompare(a.name);
     } else if (sortBy === 'date') {
-      // Since rscrs doesn't have modifiedDate, we'll skip date sorting
+      // We can implement date sorting later when we add timestamps
       return 0;
     } else if (sortBy === 'size') {
       const sizeA = a.size || 0;
@@ -138,35 +122,76 @@ export default function ResourceManagementPage() {
   };
 
   // Handle item double click (navigation or file open)
-  const handleItemDoubleClick = (item: Resource) => {
+  const handleItemDoubleClick = async (item: Resource) => {
     if (item.type === 'folder') {
-      // In a real app, this would navigate to the folder contents
-      console.log('Opening folder:', item.path);
+      navigateToFolder(Array.isArray(item.path) ? item.path : [item.path]);
     } else {
-      // In a real app, this would open the file
-      console.log('Opening file:', item.path);
+      // Download file from Supabase storage
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.storage
+          .from('files')
+          .download(Array.isArray(item.path) ? item.path.join('/') : item.path);
+
+        if (error) throw error;
+
+        // Create a download link
+        const url = URL.createObjectURL(data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = item.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error('Error downloading file:', err);
+        // Show error toast or notification
+      }
     }
   };
 
-  // Create new folder
-  const handleCreateFolder = () => {
+  // Create new folder (course)
+  const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
     
-    // In a real app, this would create the folder on the server
-    console.log('Creating folder:', newFolderName);
-    
-    setNewFolderName('');
-    setShowCreateFolderDialog(false);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      const newCourse = await createCourse(newFolderName, user.id);
+      setResources(prev => [...prev, newCourse]);
+      setNewFolderName('');
+      setShowCreateFolderDialog(false);
+    } catch (err) {
+      console.error('Error creating course:', err);
+      // Show error toast or notification
+    }
   };
 
   // Delete selected items
-  const deleteSelectedItems = () => {
+  const deleteSelectedItems = async () => {
     if (selectedItems.length === 0) return;
     
-    // In a real app, this would delete the items on the server
-    console.log('Deleting items:', selectedItems);
-    
-    setSelectedItems([]);
+    try {
+      for (const id of selectedItems) {
+        const item = resources.find(r => r.id.toString() === id);
+        if (!item) continue;
+
+        if (item.type === 'folder') {
+          await deleteCourse(id);
+        } else {
+          await deleteFile(id, item.path);
+        }
+      }
+
+      await fetchResources();
+      setSelectedItems([]);
+    } catch (err) {
+      console.error('Error deleting items:', err);
+      // Show error toast or notification
+    }
   };
 
   // Format file size to human readable
@@ -202,30 +227,70 @@ export default function ResourceManagementPage() {
 
   // File dropzone for upload
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: acceptedFiles => {
-      console.log('Files dropped:', acceptedFiles);
-      // In a real app, this would upload the files to the server
-      // and then update the resources state
-      alert(`${acceptedFiles.length} files would be uploaded here.`);
+    onDrop: async (acceptedFiles) => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!currentPath[0]) {
+          throw new Error('Please select a course before uploading files');
+        }
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        for (const file of acceptedFiles) {
+          await uploadFile(file, currentPath[0], user.id, currentPath);
+        }
+
+        await fetchResources();
+      } catch (err) {
+        console.error('Error uploading files:', err);
+        // Show error toast or notification
+      }
     },
   });
   
   // Get a single selected item for details panel
   const getSelectedItem = (): Resource | null => {
     if (selectedItems.length !== 1) return null;
-    return rscrs.find(item => item.id.toString() === selectedItems[0]) || null;
+    return resources.find(item => item.id.toString() === selectedItems[0]) || null;
   };
   
   // Toggle star status for an item
-  const toggleStar = (id: string) => {
-    // In a real app, this would update the star status on the server
-    console.log('Toggling star for item:', id);
+  const toggleStar = async (id: string) => {
+    try {
+      const supabase = createClient();
+      const item = resources.find(r => r.id.toString() === id);
+      
+      if (!item) return;
+
+      if (item.type === 'folder') {
+        // Update course star status
+        const { error } = await supabase
+          .from('courses')
+          .update({ is_starred: !item.starred })
+          .eq('id', id);
+
+        if (error) throw error;
+
+        // Update local state
+        setResources(prev =>
+          prev.map(r =>
+            r.id.toString() === id ? { ...r, starred: !r.starred } : r
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error toggling star:', err);
+      // Show error toast or notification
+    }
   };
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-60 border-r bg-muted/30 overflow-hidden flex flex-col">
+    <div className="h-full flex flex-col">
+      {/* Top bar with actions */}
+      <div className="flex items-center justify-between p-4 border-b">
         <div className="p-4 space-y-4">
           {/* create a new course */}
           <Button
