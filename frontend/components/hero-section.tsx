@@ -62,9 +62,9 @@ export function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-3"
+              className="flex flex-col sm:flex-row gap-3 cursor-pointer"
             >
-              <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 text-white group h-12 px-6 cursor-pointer"
+              <Button size="lg" className="group bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-md shadow-purple-500/20 text-white group h-12 px-6"
               onClick={() => window.location.href = "/login"}
               >
                 Get Started

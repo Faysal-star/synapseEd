@@ -24,6 +24,7 @@ import {
   Cog,
   SpeechIcon,
   LogOut,
+  LayoutDashboard,
 } from "lucide-react";
 import ChatBot from "@/components/navigation-chatbot";
 import { UserProvider, useUser } from "@/hooks/use-user";
@@ -61,6 +62,7 @@ const NavItem = ({
 };
 
 const teacherNavItems = [
+  { href: "/dashboard", icon: LayoutDashboard, title: "Dashboard" },
   {
     href: "/dashboard/resource-management",
     icon: BookOpen,
@@ -78,8 +80,9 @@ const teacherNavItems = [
 ];
 
 const studentNavItems = [
+  { href: "/dashboard", icon: LayoutDashboard, title: "Dashboard" },
   {
-    href: "/dashboard/class-resources",
+    href: "/dashboard/resource-management",
     icon: BookOpen,
     title: "Class Resources",
   },
@@ -105,7 +108,7 @@ const DashboardLayoutContent = ({
   useEffect(() => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768);
-      setIsCollapsed(window.innerWidth < 1024);
+      setIsCollapsed(window.innerWidth > 1024);
     };
 
     checkScreenSize();
@@ -129,10 +132,10 @@ const DashboardLayoutContent = ({
     .toUpperCase();
 
   const sidebarContent = (
-    <div className="flex h-full flex-col gap-4">
-      <div className="flex items-center gap-2 px-3 py-2">
+    <div className="flex h-full flex-col gap-1">
+      <div className={cn("flex items-center gap-2 px-3 py-2", isCollapsed ? "flex-col" : "")}>
         {!isCollapsed && (
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <div className="relative h-8 w-8">
               <div className="absolute inset-0 flex items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 shadow-lg">
                 <span className="text-sm font-bold text-white">S</span>
@@ -154,7 +157,7 @@ const DashboardLayoutContent = ({
           <Button
             variant="ghost"
             size="icon"
-            className="ml-auto rounded-full"
+            className="rounded-full"
             onClick={() => setIsCollapsed(!isCollapsed)}
           >
             {isCollapsed ? (
@@ -299,7 +302,7 @@ const DashboardLayoutContent = ({
       )}
 
       {/* Main content */}
-      <div className="flex-1">{children}</div>
+      <div className={"flex-1 "}>{children}</div>
 
       <ChatBot />
     </div>
