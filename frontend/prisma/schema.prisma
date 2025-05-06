@@ -16,15 +16,15 @@ datasource db {
 
 // Profile model based on the signup database action
 model Profile {
-  id            String    @id
-  name          String
+  id            String    @id @default(uuid())
+  name          String?
   email         String    @unique
   role          String    @default("student")
   avatarUrl     String?   @map("avatar_url")
   bio           String?
   institution   String?
   createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  updatedAt     DateTime  @updatedAt @default(now()) @map("updated_at")
   
   // Relations
   examResults   ExamResult[]
@@ -47,10 +47,10 @@ model Profile {
 model Course {
   id          Int       @id @default(autoincrement())
   name        String    
-  description String
+  description String?
   isStarred   Boolean   @default(false) @map("is_starred")
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime?  @updatedAt @map("updated_at")
   
   // Relations
   resources   Resource[]

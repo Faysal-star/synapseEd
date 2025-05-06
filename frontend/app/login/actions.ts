@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 import { createClient } from '@/utils/supabase/server'
 import { createClient as c } from '@supabase/supabase-js'
+import prisma from '@/lib/prisma'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -84,17 +85,19 @@ export async function signup(formData: FormData) {
   }
 
   // 3. Insert user profile data into the 'profiles' table
-  const { error: insertError } = await supabase.from('profiles').insert({
-    id: user.id,
-    name,
-    email,
-    role,
-    avatar_url: avatarUrl, // The URL of the uploaded avatar
+  const data = await prisma.profile.create({
+    data: {
+      id: user.id,
+      email: email,
+      name: name || null,
+      role: role,
+      avatarUrl: avatarUrl || null,
+    },
   })
 
-  if (insertError) {
-    console.error('Insert profile error:', insertError)
-    redirect(`/error?message=${"Insert Error:"+insertError.message}`)
+  if (!data) {
+    //console.error('Insert profile error:', insertError)
+    redirect(`/error?message=${"Insert Error): "+data}`)
   }
 
   // Optional: trigger revalidation (if you're using Next.js Incremental Static Regeneration)
