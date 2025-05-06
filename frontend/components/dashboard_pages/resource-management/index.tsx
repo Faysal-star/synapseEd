@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -17,177 +16,67 @@ import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileA
 // Types
 type FileType = 'folder' | 'pdf' | 'doc' | 'image' | 'archive' | 'audio' | 'video' | 'other';
 
-interface ResourceItem {
-  id: string;
+interface Resource {
+  id: number;
+  course_id: number;
+  user_id: string;
   name: string;
-  type: FileType;
-  size?: number;
-  modifiedDate: Date;
-  children?: ResourceItem[];
-  starred?: boolean;
-  path?: string[];
+  path: string;
+  size: number | null;
+  type: string;
+  starred: boolean;
+  modifiedDate: string;
 }
 
-// Sample data for demonstration
-const initialResources: ResourceItem[] = [
+const rscrs: Resource[] = [
   {
-    id: 'folder-1',
-    name: 'Physics',
-    type: 'folder',
-    modifiedDate: new Date('2025-04-30'),
-    path: ['Physics'],
-    children: [
-      {
-        id: 'folder-1-1',
-        name: 'Mechanics',
-        type: 'folder',
-        modifiedDate: new Date('2025-04-28'),
-        path: ['Physics', 'Mechanics'],
-        children: [
-          {
-            id: 'file-1-1-1',
-            name: 'Newton\'s Laws.pdf',
-            type: 'pdf',
-            size: 2500000,
-            modifiedDate: new Date('2025-04-28'),
-            starred: true,
-            path: ['Physics', 'Mechanics', 'Newton\'s Laws.pdf'],
-          },
-          {
-            id: 'file-1-1-2',
-            name: 'Projectile Motion.pdf',
-            type: 'pdf',
-            size: 1800000,
-            modifiedDate: new Date('2025-04-27'),
-            path: ['Physics', 'Mechanics', 'Projectile Motion.pdf'],
-          },
-        ],
-      },
-      {
-        id: 'folder-1-2',
-        name: 'Electromagnetism',
-        type: 'folder',
-        modifiedDate: new Date('2025-04-26'),
-        path: ['Physics', 'Electromagnetism'],
-        children: [
-          {
-            id: 'file-1-2-1',
-            name: 'Maxwell\'s Equations.pdf',
-            type: 'pdf',
-            size: 3200000,
-            modifiedDate: new Date('2025-04-26'),
-            path: ['Physics', 'Electromagnetism', 'Maxwell\'s Equations.pdf'],
-          },
-          {
-            id: 'file-1-2-2',
-            name: 'Electric Fields Simulation.mp4',
-            type: 'video',
-            size: 25000000,
-            modifiedDate: new Date('2025-04-25'),
-            path: ['Physics', 'Electromagnetism', 'Electric Fields Simulation.mp4'],
-          },
-        ],
-      }
-    ],
-  },
-  {
-    id: 'folder-2',
-    name: 'Chemistry',
-    type: 'folder',
-    modifiedDate: new Date('2025-04-29'),
-    path: ['Chemistry'],
+    id: 1,
+    course_id: 101,
+    user_id: "uuid-123",
+    name: "Lecture Notes",
+    path: "/files/notes.pdf",
+    size: 204800,
+    type: "pdf",
     starred: true,
-    children: [
-      {
-        id: 'file-2-1',
-        name: 'Periodic Table Guide.pdf',
-        type: 'pdf',
-        size: 1500000,
-        modifiedDate: new Date('2025-04-29'),
-        path: ['Chemistry', 'Periodic Table Guide.pdf'],
-      },
-      {
-        id: 'file-2-2',
-        name: 'Chemical Bonding.ppt',
-        type: 'doc',
-        size: 4800000,
-        modifiedDate: new Date('2025-04-28'),
-        path: ['Chemistry', 'Chemical Bonding.ppt'],
-      },
-      {
-        id: 'file-2-3',
-        name: 'Lab Safety Guide.doc',
-        type: 'doc',
-        size: 950000,
-        modifiedDate: new Date('2025-04-27'),
-        path: ['Chemistry', 'Lab Safety Guide.doc'],
-        starred: true,
-      }
-    ],
+    modifiedDate: "2023-08-20T10:30:00Z",
   },
   {
-    id: 'folder-3',
-    name: 'Biology',
-    type: 'folder',
-    modifiedDate: new Date('2025-04-25'),
-    path: ['Biology'],
-    children: [
-      {
-        id: 'file-3-1',
-        name: 'Cell Structure Diagram.png',
-        type: 'image',
-        size: 3500000,
-        modifiedDate: new Date('2025-04-25'),
-        path: ['Biology', 'Cell Structure Diagram.png'],
-      },
-      {
-        id: 'folder-3-1',
-        name: 'Genetics',
-        type: 'folder',
-        modifiedDate: new Date('2025-04-24'),
-        path: ['Biology', 'Genetics'],
-        children: [
-          {
-            id: 'file-3-1-1',
-            name: 'DNA Replication.pptx',
-            type: 'doc',
-            size: 5200000,
-            modifiedDate: new Date('2025-04-24'),
-            path: ['Biology', 'Genetics', 'DNA Replication.pptx'],
-          }
-        ],
-      }
-    ],
+    id: 2,
+    course_id: 101,
+    user_id: "uuid-123",
+    name: "Diagram.png",
+    path: "/files/diagram.png",
+    size: 512000,
+    type: "image",
+    starred: false,
+    modifiedDate: "2023-08-20T10:30:00Z",
   },
   {
-    id: 'folder-4',
-    name: 'Mathematics',
-    type: 'folder',
-    modifiedDate: new Date('2025-04-20'),
-    path: ['Mathematics'],
-    children: [
-      {
-        id: 'file-4-1',
-        name: 'Calculus Formulas.pdf',
-        type: 'pdf',
-        size: 1200000,
-        modifiedDate: new Date('2025-04-20'),
-        path: ['Mathematics', 'Calculus Formulas.pdf'],
-      },
-      {
-        id: 'file-4-2',
-        name: 'Algebra Worksheets.zip',
-        type: 'archive',
-        size: 8500000,
-        modifiedDate: new Date('2025-04-19'),
-        path: ['Mathematics', 'Algebra Worksheets.zip'],
-      }
-    ],
+    id: 3,
+    course_id: 102,
+    user_id: "uuid-234",
+    name: "Project.mp4",
+    path: "/files/project.mp4",
+    size: 10485760,
+    type: "video",
+    starred: false,
+    modifiedDate: "2023-08-20T10:30:00Z",
+  },
+  {
+    id: 4,
+    course_id: 103,
+    user_id: "uuid-345",
+    name: "Course Materials",
+    path: "/files/folder1/",
+    size: null,
+    type: "folder",
+    starred: true,
+    modifiedDate: "2023-08-20T10:30:00Z",
   },
 ];
 
+
 export default function ResourceManagementPage() {
-  const [resources, setResources] = useState<ResourceItem[]>(initialResources);
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -200,22 +89,8 @@ export default function ResourceManagementPage() {
   
   // Get current folder resources based on path
   const getCurrentResources = useCallback(() => {
-    if (currentPath.length === 0) {
-      return resources;
-    }
-    
-    let current = [...resources];
-    for (const pathPart of currentPath) {
-      const folder = current.find(item => item.name === pathPart && item.type === 'folder');
-      if (folder && folder.children) {
-        current = folder.children;
-      } else {
-        return [];
-      }
-    }
-    
-    return current;
-  }, [resources, currentPath]);
+    return rscrs;
+  }, []);
 
   // Filtered and sorted resources
   const filteredResources = getCurrentResources().filter(item => 
@@ -231,9 +106,8 @@ export default function ResourceManagementPage() {
         ? a.name.localeCompare(b.name)
         : b.name.localeCompare(a.name);
     } else if (sortBy === 'date') {
-      return sortDirection === 'asc'
-        ? a.modifiedDate.getTime() - b.modifiedDate.getTime()
-        : b.modifiedDate.getTime() - a.modifiedDate.getTime();
+      // Since rscrs doesn't have modifiedDate, we'll skip date sorting
+      return 0;
     } else if (sortBy === 'size') {
       const sizeA = a.size || 0;
       const sizeB = b.size || 0;
@@ -264,12 +138,13 @@ export default function ResourceManagementPage() {
   };
 
   // Handle item double click (navigation or file open)
-  const handleItemDoubleClick = (item: ResourceItem) => {
-    if (item.type === 'folder' && item.path) {
-      navigateToFolder(item.path);
+  const handleItemDoubleClick = (item: Resource) => {
+    if (item.type === 'folder') {
+      // In a real app, this would navigate to the folder contents
+      console.log('Opening folder:', item.path);
     } else {
       // In a real app, this would open the file
-      console.log('Opening file:', item.name);
+      console.log('Opening file:', item.path);
     }
   };
 
@@ -277,37 +152,8 @@ export default function ResourceManagementPage() {
   const handleCreateFolder = () => {
     if (!newFolderName.trim()) return;
     
-    const newFolder: ResourceItem = {
-      id: `folder-${Date.now()}`,
-      name: newFolderName,
-      type: 'folder',
-      modifiedDate: new Date(),
-      path: [...currentPath, newFolderName],
-      children: []
-    };
-    
-    if (currentPath.length === 0) {
-      setResources(prev => [...prev, newFolder]);
-    } else {
-      // Deep clone and update the resources tree
-      const updatedResources = [...resources];
-      let current = updatedResources;
-      
-      // Navigate to the current folder
-      for (let i = 0; i < currentPath.length; i++) {
-        const folderIndex = current.findIndex(
-          item => item.name === currentPath[i] && item.type === 'folder'
-        );
-        
-        if (folderIndex !== -1 && current[folderIndex].children) {
-          current = current[folderIndex].children!;
-        }
-      }
-      
-      // Add new folder to current location
-      current.push(newFolder);
-      setResources(updatedResources);
-    }
+    // In a real app, this would create the folder on the server
+    console.log('Creating folder:', newFolderName);
     
     setNewFolderName('');
     setShowCreateFolderDialog(false);
@@ -317,43 +163,8 @@ export default function ResourceManagementPage() {
   const deleteSelectedItems = () => {
     if (selectedItems.length === 0) return;
     
-    // For simplicity, we'll just filter out the selected items
-    // In a real app, this would be more complex for nested structures
-    if (currentPath.length === 0) {
-      setResources(prev => prev.filter(item => !selectedItems.includes(item.id)));
-    } else {
-      // Deep clone and update the resources tree
-      const updatedResources = [...resources];
-      let current = updatedResources;
-      let parentArray = current;
-      
-      // Navigate to the current folder
-      for (let i = 0; i < currentPath.length; i++) {
-        const folderIndex = current.findIndex(
-          item => item.name === currentPath[i] && item.type === 'folder'
-        );
-        
-        if (folderIndex !== -1 && current[folderIndex].children) {
-          parentArray = current;
-          current = current[folderIndex].children!;
-        }
-      }
-      
-      // Filter out selected items
-      const filteredChildren = current.filter(item => !selectedItems.includes(item.id));
-      
-      // Find the parent folder and update its children
-      const lastFolderName = currentPath[currentPath.length - 1];
-      const folderIndex = parentArray.findIndex(
-        item => item.name === lastFolderName && item.type === 'folder'
-      );
-      
-      if (folderIndex !== -1) {
-        parentArray[folderIndex].children = filteredChildren;
-      }
-      
-      setResources(updatedResources);
-    }
+    // In a real app, this would delete the items on the server
+    console.log('Deleting items:', selectedItems);
     
     setSelectedItems([]);
   };
@@ -400,33 +211,15 @@ export default function ResourceManagementPage() {
   });
   
   // Get a single selected item for details panel
-  const getSelectedItem = (): ResourceItem | null => {
+  const getSelectedItem = (): Resource | null => {
     if (selectedItems.length !== 1) return null;
-    
-    const currentResources = getCurrentResources();
-    return currentResources.find(item => item.id === selectedItems[0]) || null;
+    return rscrs.find(item => item.id.toString() === selectedItems[0]) || null;
   };
   
   // Toggle star status for an item
   const toggleStar = (id: string) => {
-    const toggleStarRecursive = (items: ResourceItem[]): ResourceItem[] => {
-      return items.map(item => {
-        if (item.id === id) {
-          return { ...item, starred: !item.starred };
-        }
-        
-        if (item.children) {
-          return {
-            ...item,
-            children: toggleStarRecursive(item.children)
-          };
-        }
-        
-        return item;
-      });
-    };
-    
-    setResources(toggleStarRecursive(resources));
+    // In a real app, this would update the star status on the server
+    console.log('Toggling star for item:', id);
   };
 
   return (
@@ -434,45 +227,36 @@ export default function ResourceManagementPage() {
       {/* Sidebar */}
       <div className="w-60 border-r bg-muted/30 overflow-hidden flex flex-col">
         <div className="p-4 space-y-4">
-          <Button className="w-full justify-start gap-2" size="sm">
+          {/* create a new course */}
+          <Button
+            className="w-full justify-start gap-2"
+            size="sm"
+            onClick={() => setShowCreateFolderDialog(true)}  // Open dialog when clicked
+          >
             <Plus className="h-4 w-4" />
             New
           </Button>
           
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground px-2">LOCATIONS</p>
-            <Button variant="ghost" className="w-full justify-start gap-2" size="sm" onClick={() => navigateToFolder([])}>
-              <FolderOpen className="h-4 w-4" />
-              All Files
-            </Button>
-            <Button variant="ghost" className="w-full justify-start gap-2" size="sm" onClick={() => {}}>
-              <Star className="h-4 w-4 text-yellow-500" />
-              Starred
-            </Button>
-            <Button variant="ghost" className="w-full justify-start gap-2" size="sm" onClick={() => {}}>
-              <Clock className="h-4 w-4" />
-              Recent
-            </Button>
-          </div>
-          
           <Separator />
           
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground px-2">FOLDERS</p>
-            {resources.filter(item => item.type === 'folder').map(folder => (
-              <Button 
-                key={folder.id} 
-                variant={currentPath[0] === folder.name ? "secondary" : "ghost"} 
-                className="w-full justify-start gap-2 truncate" 
+            <p className="text-xs font-medium text-muted-foreground px-2">COURSES</p>
+            {['CSE 101', 'HUM 102', 'MATH 203', 'PHY 101'].map(course => (
+              <Button
+                key={course}
+                variant="ghost"
+                className="w-full justify-start gap-2 truncate"
                 size="sm"
-                onClick={() => navigateToFolder([folder.name])}
+                onClick={() => alert(`Navigating to ${course}`)} // Replace with actual navigation logic
               >
                 <Folder className="h-4 w-4 flex-shrink-0 text-blue-500" />
-                <span className="truncate">{folder.name}</span>
-                {folder.starred && <Star className="h-3 w-3 ml-auto text-yellow-500 flex-shrink-0" />}
+                <span className="truncate">{course}</span>
+                {/* You can add a star icon if necessary */}
+                <Star className="h-3 w-3 ml-auto text-yellow-500 flex-shrink-0" />
               </Button>
             ))}
           </div>
+
         </div>
         
         <div className="mt-auto p-4">
@@ -556,16 +340,6 @@ export default function ResourceManagementPage() {
         
         {/* Action toolbar */}
         <div className="border-b p-2 bg-background flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2"
-            onClick={() => setShowCreateFolderDialog(true)}
-          >
-            <FolderPlus className="h-4 w-4" />
-            New Folder
-          </Button>
-          
           <Button
             variant="ghost"
             size="sm"
@@ -659,12 +433,22 @@ export default function ResourceManagementPage() {
                     <div
                       className={cn(
                         "flex flex-col items-center p-3 rounded-lg cursor-pointer transition-all border relative group",
-                        selectedItems.includes(item.id) 
+                        selectedItems.includes(item.id.toString()) 
                           ? "bg-accent border-primary"
                           : "hover:bg-accent/50 border-transparent"
                       )}
-                      onClick={() => toggleSelectItem(item.id)}
-                      onDoubleClick={() => handleItemDoubleClick(item)}
+                      onClick={() => toggleSelectItem(item.id.toString())}
+                      onDoubleClick={() => handleItemDoubleClick({
+                        id: item.id,
+                        name: item.name,
+                        type: item.type as FileType,
+                        size: item.size ?? null,
+                        modifiedDate: new Date().toISOString(),
+                        course_id: item.course_id,
+                        user_id: item.user_id,
+                        path: item.path,
+                        starred: item.starred
+                      })}
                     >
                       {/* Star button */}
                       <button 
@@ -676,7 +460,7 @@ export default function ResourceManagementPage() {
                         )}
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleStar(item.id);
+                          toggleStar(item.id.toString());
                         }}
                       >
                         <Star 
@@ -689,10 +473,10 @@ export default function ResourceManagementPage() {
                       
                       {/* File icon */}
                       <div className="mb-2 mt-2 relative">
-                        {getFileIcon(item.type)}
+                        {getFileIcon(item.type as FileType)}
                         
                         {/* Selection check */}
-                        {selectedItems.includes(item.id) && (
+                        {selectedItems.includes(item.id.toString()) && (
                           <div className="absolute -top-2 -right-2 h-5 w-5 bg-primary rounded-full flex items-center justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-primary-foreground">
                               <polyline points="20 6 9 17 4 12"></polyline>
@@ -707,7 +491,7 @@ export default function ResourceManagementPage() {
                           {item.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {item.type !== 'folder' && formatFileSize(item.size)}
+                          {item.type !== 'folder' && formatFileSize(item.size ?? undefined)}
                         </p>
                       </div>
                     </div>
@@ -771,11 +555,11 @@ export default function ResourceManagementPage() {
                     <div
                       className={cn(
                         "grid grid-cols-12 gap-4 px-4 py-2 rounded-md cursor-pointer items-center",
-                        selectedItems.includes(item.id) 
+selectedItems.includes(item.id.toString())
                           ? "bg-accent" 
                           : "hover:bg-accent/50"
                       )}
-                      onClick={() => toggleSelectItem(item.id)}
+                      onClick={() => toggleSelectItem(item.id.toString())}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
                       <div className="col-span-6 flex items-center gap-3 truncate">
@@ -783,7 +567,7 @@ export default function ResourceManagementPage() {
                           {item.type === 'folder' ? (
                             <FolderOpen className="h-6 w-6 text-blue-500" />
                           ) : (
-                            getFileIcon(item.type)
+getFileIcon(item.type as FileType)
                           )}
                         </div>
                         
@@ -797,11 +581,11 @@ export default function ResourceManagementPage() {
                       </div>
                       
                       <div className="col-span-2 text-sm text-muted-foreground">
-                        {item.modifiedDate.toLocaleDateString()}
+                        {new Date().toLocaleDateString()} {/* Temporary placeholder - should use actual modified date from API */}
                       </div>
                       
                       <div className="col-span-2 text-sm text-muted-foreground">
-                        {item.type !== 'folder' && formatFileSize(item.size)}
+                        {item.type !== 'folder' && formatFileSize(item.size ?? undefined)}
                       </div>
                       
                       <div className="col-span-2 flex items-center gap-1">
@@ -812,7 +596,7 @@ export default function ResourceManagementPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => toggleStar(item.id)}>
+                            <DropdownMenuItem onClick={() => toggleStar(item.id.toString())}>
                               <Star className={cn("h-4 w-4 mr-2", item.starred ? "text-yellow-500 fill-yellow-500" : "")} />
                               {item.starred ? 'Remove Star' : 'Star'}
                             </DropdownMenuItem>
@@ -826,7 +610,7 @@ export default function ResourceManagementPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => {
-                              setSelectedItems([item.id]);
+                              setSelectedItems([item.id.toString()]);
                               deleteSelectedItems();
                             }}>
                               <Trash className="h-4 w-4 mr-2" />
@@ -843,20 +627,20 @@ export default function ResourceManagementPage() {
           </ScrollArea>
           
           {/* Details panel */}
-          {showDetails && (
+          {showDetails && ( 
             <div className="w-80 border-l bg-muted/20 p-4 overflow-y-auto">
               {getSelectedItem() ? (
                 <div className="space-y-6">
                   <div className="text-center">
                     <div className="mx-auto mb-3 w-16 h-16 flex items-center justify-center">
-                      {getFileIcon(getSelectedItem()!.type)}
+                      {getFileIcon(getSelectedItem()!.type as FileType)}
                     </div>
                     <h3 className="font-medium text-lg break-all">
                       {getSelectedItem()!.name}
                     </h3>
                     {getSelectedItem()!.type !== 'folder' && (
                       <p className="text-sm text-muted-foreground">
-                        {formatFileSize(getSelectedItem()!.size)}
+                        {formatFileSize(getSelectedItem()!.size ?? undefined)}
                       </p>
                     )}
                   </div>
@@ -882,14 +666,14 @@ export default function ResourceManagementPage() {
                         <div className="flex justify-between">
                           <span>Modified</span>
                           <span className="font-medium">
-                            {getSelectedItem()!.modifiedDate.toLocaleDateString()}
+                            {new Date(getSelectedItem()!.modifiedDate).toLocaleDateString()}
                           </span>
                         </div>
                         {getSelectedItem()!.type !== 'folder' && (
                           <div className="flex justify-between">
                             <span>Size</span>
                             <span className="font-medium">
-                              {formatFileSize(getSelectedItem()!.size)}
+                              {formatFileSize(getSelectedItem()!.size || undefined)}
                             </span>
                           </div>
                         )}
@@ -903,7 +687,7 @@ export default function ResourceManagementPage() {
                         variant="outline" 
                         size="sm" 
                         className="w-full justify-start gap-2"
-                        onClick={() => toggleStar(getSelectedItem()!.id)}
+                        onClick={() => toggleStar(getSelectedItem()!.id.toString())}
                       >
                         <Star className={cn(
                           "h-4 w-4", 
@@ -948,7 +732,7 @@ export default function ResourceManagementPage() {
         </div>
       </div>
       
-      {/* Create folder dialog */}
+      {/* Create a course dialog */}
       <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
         <DialogContent>
           <DialogHeader>
