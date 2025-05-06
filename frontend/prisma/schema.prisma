@@ -30,20 +30,25 @@ model Profile {
   examResults   ExamResult[]
   examsCreated  Exam[]
   examsTaken    Exam[]    @relation("ExamsTaken")
+  coursesCreated Course[] @relation("CourseCreator")
   courses       Course[]  @relation("CourseStudents")
   coursesTeaching Course[] @relation("CourseTeachers")
   resources     Resource[]
   lecturePlans  LecturePlan[]
   feedbacks     Feedback[]
   disqualifications Disqualification[]
+  notifications Notification[]
+  files         File[]
+  sharedFiles   FileSharing[]
   
   @@map("profiles")
 }
 
 model Course {
-  id          String    @id @default(uuid())
-  title       String
+  id          Int       @id @default(autoincrement())
+  name        String    
   description String
+  isStarred   Boolean   @default(false) @map("is_starred")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   
@@ -52,10 +57,32 @@ model Course {
   exams       Exam[]
   lecturePlans LecturePlan[]
   feedbacks   Feedback[]
+  files       File[]    
+  createdById String    @map("created_by")
+  createdBy   Profile   @relation("CourseCreator", fields: [createdById], references: [id])
   teachers    Profile[] @relation("CourseTeachers")
   students    Profile[] @relation("CourseStudents")
   
   @@map("courses")
+}
+
+model File {
+  id            Int       @id @default(autoincrement())
+  filename      String    
+  filePath      String    @map("file_path")
+  fileType      String    @map("file_type")
+  fileSize      Int?      @map("file_size")
+  userId        String    @map("user_id")
+  courseId      Int?      @map("course_id") // Changed to Int? to match Course.id type
+  uploadedAt    DateTime  @default(now()) @map("uploaded_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  user          Profile   @relation(fields: [userId], references: [id])
+  course        Course?   @relation(fields: [courseId], references: [id])
+  sharedWith    FileSharing[]
+  
+  @@map("files")
 }
 
 model Topic {
@@ -84,7 +111,7 @@ model Exam {
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
   createdById     String      @map("created_by_id")
-  courseId        String?     @map("course_id")
+  courseId        Int?        @map("course_id") // Changed to Int? to match Course.id type
   topicId         String?     @map("topic_id")
   
   // Relations
@@ -183,7 +210,7 @@ model Resource {
   fileUrl     String    @map("file_url")
   fileType    String    @map("file_type")
   uploadedById String    @map("uploaded_by")
-  courseId    String?   @map("course_id")
+  courseId    Int?      @map("course_id")  // Changed to Int? to match Course.id type
   examId      String?   @map("exam_id")
   topicId     String?   @map("topic_id")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -207,7 +234,7 @@ model LecturePlan {
   content     Json      // Stores structured lecture content
   duration    Int       // in minutes
   createdById String    @map("created_by")
-  courseId    String?   @map("course_id")
+  courseId    Int?      @map("course_id")  // Changed to Int? to match Course.id type
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   
@@ -224,7 +251,7 @@ model Feedback {
   userId      String    @map("user_id")
   content     String
   rating      Int
-  courseId    String?   @map("course_id")
+  courseId    Int?      @map("course_id")  // Changed to Int? to match Course.id type
   createdAt   DateTime  @default(now()) @map("created_at")
   
   // Relations
@@ -232,6 +259,34 @@ model Feedback {
   course      Course?   @relation(fields: [courseId], references: [id])
   
   @@map("feedback")
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  type        String
+  content     String
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  // Relations
+  user        Profile   @relation(fields: [userId], references: [id])
+  
+  @@map("notifications")
+}
+
+// FileSharing model for tracking shared files
+model FileSharing {
+  id          Int       @id @default(autoincrement())
+  fileId      Int       @map("file_id")
+  userId      String    @map("user_id")
+  sharedAt    DateTime  @default(now()) @map("shared_at")
+  
+  // Relations
+  file        File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user        Profile   @relation(fields: [userId], references: [id])
+  
+  @@map("file_sharing")
 }
 
 // Enum for Question Difficulty
