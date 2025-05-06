@@ -430,7 +430,7 @@ export default function ResourceManagementPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Sidebar */}
       <div className="w-60 border-r bg-muted/30 overflow-hidden flex flex-col">
         <div className="p-4 space-y-4">
@@ -493,7 +493,7 @@ export default function ResourceManagementPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top toolbar */}
         <div className="border-b p-3 flex items-center justify-between bg-background">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button variant="outline" size="icon" onClick={() => navigateToFolder([])}>
               <ChevronRight className="h-4 w-4 rotate-180" />
             </Button>
@@ -668,6 +668,8 @@ export default function ResourceManagementPage() {
                     >
                       {/* Star button */}
                       <button 
+                        title='Star this item'
+                        type="button"
                         className={cn(
                           "absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity",
                           item.starred && "opacity-100"
