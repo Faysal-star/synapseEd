@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Search, SendHorizontal, Wand2, Globe, SquarePen, Brain, Sparkles, Lightbulb, AlertCircle, ThumbsUp, ThumbsDown, Check, Info } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { useUser } from "@/hooks/use-user";
+import { useToast } from "@/components/ui/use-toast";
 import { toast } from "@/components/ui/use-toast";
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -64,7 +66,10 @@ export default function AIAgentsPage() {
   const [showWebSearch, setShowWebSearch] = useState(false);
   const [showReasoning, setShowReasoning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [userType] = useState<'teacher' | 'student'>('teacher'); // Would be from context or props
+ 
+  // User role and type
+  const { role, user } = useUser();
+  const userType = role || 'student';
   
   // Feedback dialog state
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
@@ -104,19 +109,29 @@ export default function AIAgentsPage() {
       icon: <Brain className="h-5 w-5" />,
       description: 'Get guidance on personal and academic challenges'
     },
-    {
-      id: 'question-generation',
-      name: 'Question Generation',
-      icon: <Lightbulb className="h-5 w-5" />,
-      description: 'Generate quizzes, tests, and assessment materials'
-    },
-    {
-      id: 'lecture-planner',
-      name: 'Lecture Planner',
-      icon: <SquarePen className="h-5 w-5" />,
-      description: 'Create comprehensive lesson plans and activities'
-    }
+    ...(userType === 'teacher' ? [
+      {
+        id: 'question-generation',
+        name: 'Question Generation',
+        icon: <Lightbulb className="h-5 w-5" />,
+        description: 'Generate quizzes, tests, and assessment materials'
+      },
+      {
+        id: 'lecture-planner',
+        name: 'Lecture Planner',
+        icon: <SquarePen className="h-5 w-5" />,
+        description: 'Create comprehensive lesson plans and activities'
+      }
+    ] : [])
   ];
+
+
+  useEffect(() => {
+    if (userType === 'student' && 
+       (activeAgent === 'question-generation' || activeAgent === 'lecture-planner')) {
+      setActiveAgent('smart-counselor');
+    }
+  }, [userType, activeAgent]);
 
   // Scroll to bottom when new messages are added
   useEffect(() => {
