@@ -85,7 +85,7 @@ export function HeroSection() {
             >
               <p className="text-sm text-muted-foreground mb-3">Trusted by leading educational institutions</p>
               <div className="flex items-center gap-6 flex-wrap">
-                {["Stanford", "MIT", "Harvard", "Oxford"].map((name, i) => (
+                {[].map((name, i) => (
                   <div 
                     key={name} 
                     className="text-muted-foreground/50 font-semibold text-sm sm:text-base"
