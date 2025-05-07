@@ -14,7 +14,9 @@ eggs/
 lib64/
 parts/
 sdist/
+storage/
 var/
+numpy
 *.egg-info/
 .installed.cfg
 *.egg
@@ -53,5 +55,6 @@ yarn-error.log
 *.swp
 *.swo
 .DS_Store
+logs/
 
 tldraw_socket/

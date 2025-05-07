@@ -35,7 +35,7 @@ const CodeEditor = dynamic(
   { ssr: false }
 );
 
-const WORKER_URL = `http://localhost:5858`;
+const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || "http://localhost:5858";
 const roomId = "test-room";
 
 const multiplayerAssets: TLAssetStore = {

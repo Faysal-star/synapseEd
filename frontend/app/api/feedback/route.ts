@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Configure backend API URL with a default fallback
-const API_BASE_URL ='http://localhost:5003';
+const API_BASE_URL =process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export async function POST(request: NextRequest) {
   try {

@@ -29,6 +29,8 @@ interface LecturePlan {
   tools_used: string[];
 }
 
+const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 export default function LecturePlannerApiComponent() {
   const { toast } = useToast();
   
@@ -53,7 +55,7 @@ export default function LecturePlannerApiComponent() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('/api/lecture-planner', {
+      const response = await fetch(`${backendUrl}/api/lecture-planner/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,8 +71,9 @@ export default function LecturePlannerApiComponent() {
       }
       
       const data = await response.json();
-      setLecturePlan(data);
-      setLecturePlanId(`temp-${Date.now()}`); // In a real app, get this from the response
+      setLecturePlan(data.plan);
+      console.log('Generated lecture plan:', data);
+      setLecturePlanId(`data.id`); // In a real app, get this from the response
       
       // Initialize editable states
       setEditableLearningObjectives(data.learning_objectives);
@@ -99,7 +102,7 @@ export default function LecturePlannerApiComponent() {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`/api/lecture-planner/${lecturePlanId}/learning-objectives`, {
+      const response = await fetch(`${backendUrl}/api/lecture-planner/${lecturePlanId}/learning-objectives`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -115,6 +118,7 @@ export default function LecturePlannerApiComponent() {
       
       const data = await response.json();
       setLecturePlan(data);
+      console.log('Updated lecture plan:', data);
       
       toast({
         title: "Learning Objectives Updated",
@@ -138,7 +142,7 @@ export default function LecturePlannerApiComponent() {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`/api/lecture-planner/${lecturePlanId}/topics`, {
+      const response = await fetch(`${backendUrl}/api/lecture-planner/${lecturePlanId}/topics`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +181,7 @@ export default function LecturePlannerApiComponent() {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`/api/lecture-planner/${lecturePlanId}/teaching-methods`, {
+      const response = await fetch(`${backendUrl}/api/lecture-planner/${lecturePlanId}/teaching-methods`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -216,7 +220,7 @@ export default function LecturePlannerApiComponent() {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`/api/lecture-planner/${lecturePlanId}/resources`, {
+      const response = await fetch(`${backendUrl}/api/lecture-planner/${lecturePlanId}/resources`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -332,12 +336,12 @@ export default function LecturePlannerApiComponent() {
   
   return (
     <div className="flex flex-col w-full h-full p-6 gap-6">
-      <div className="flex justify-between items-center">
+      {/* <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Lecture Planner</h1>
           <p className="text-sm text-muted-foreground">Create comprehensive lesson plans and activities</p>
         </div>
-      </div>
+      </div> */}
       
       {/* Main content area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -479,7 +483,7 @@ export default function LecturePlannerApiComponent() {
                               </div>
                             ) : (
                               <ul className="space-y-3 list-disc pl-5">
-                                {lecturePlan.learning_objectives.map((objective, index) => (
+                                {lecturePlan?.learning_objectives?.map((objective, index) => (
                                   <li key={index} className="text-sm">
                                     {objective}
                                   </li>

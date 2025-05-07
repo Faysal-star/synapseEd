@@ -66,7 +66,7 @@ export default function WebSearchPage() {
   const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
   const [showMemoryStats, setShowMemoryStats] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Feedback dialog state
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackMessageId, setFeedbackMessageId] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export default function WebSearchPage() {
       content: "I can search the web for current information and resources. What would you like to know more about?",
       timestamp: new Date()
     };
-    
+
     setMessages([initialMessage]);
   }, []);
 
@@ -103,9 +103,9 @@ export default function WebSearchPage() {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    
+
     if (!inputValue.trim()) return;
-    
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -113,15 +113,15 @@ export default function WebSearchPage() {
       content: inputValue,
       timestamp: new Date()
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
-    
+
     try {
       // Call the backend API - using the direct URL approach like in question_generation
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5003';
-      const response = await fetch(`${backendUrl}/api/chat`, {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${backendUrl}/api/web-search/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,13 +134,13 @@ export default function WebSearchPage() {
           }
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       // Add assistant message with searched_websites
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -151,23 +151,23 @@ export default function WebSearchPage() {
         reasoning: data.reasoning,
         searched_websites: data.searched_websites || [] // Store searched websites
       };
-      
+
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       // Set this message as active to show its sources in the sidebar
       setActiveMessageId(assistantMessage.id);
-      
+
       // Update conversation ID if this is the first message
       if (!conversationId || conversationId.startsWith('websearch-')) {
         setConversationId(data.conversation_id);
       }
-      
+
       // Fetch memory stats after receiving response
       fetchMemoryStats(data.conversation_id);
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
-      
+
       // Add error message
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -176,9 +176,9 @@ export default function WebSearchPage() {
         timestamp: new Date(),
         isError: true
       };
-      
+
       setMessages(prev => [...prev, errorMessage]);
-      
+
       toast({
         title: "Error",
         description: "Failed to get a response. Please try again.",
@@ -192,8 +192,9 @@ export default function WebSearchPage() {
   const fetchMemoryStats = async (convoId: string) => {
     try {
       // Use the same backend URL approach as in handleSendMessage
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5003';
-      const response = await fetch(`${backendUrl}/api/memory_stats`, {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      // Fix the URL to match the correct backend endpoint
+      const response = await fetch(`${backendUrl}/api/web-search/memory-stats`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -202,14 +203,14 @@ export default function WebSearchPage() {
           conversation_id: convoId,
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const data = await response.json();
       setMemoryStats(data);
-      
+
     } catch (error) {
       console.error('Error fetching memory stats:', error);
       toast({
@@ -223,8 +224,8 @@ export default function WebSearchPage() {
   const submitFeedback = async (messageId: string, rating: number, feedbackText = '') => {
     try {
       // Use the same backend URL approach as in handleSendMessage
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:5003';
-      const response = await fetch(`${backendUrl}/api/feedback`, {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${backendUrl}/api/web-search/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -236,29 +237,29 @@ export default function WebSearchPage() {
           feedback_text: feedbackText
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       // Mark the message as having feedback
-      setMessages(prevMessages => 
-        prevMessages.map(msg => 
-          msg.role === 'assistant' && msg.messageId === messageId 
-            ? { ...msg, hasFeedback: true } 
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.role === 'assistant' && msg.messageId === messageId
+            ? { ...msg, hasFeedback: true }
             : msg
         )
       );
-      
+
       toast({
         title: "Feedback submitted",
         description: "Thank you for your feedback!",
         variant: "default"
       });
-      
+
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      
+
       toast({
         title: "Error",
         description: "Failed to submit feedback. Please try again.",
@@ -313,7 +314,7 @@ export default function WebSearchPage() {
   // Helper function to get page title from URL
   const getPageTitle = (url: string) => {
     const domain = getDomainName(url);
-    
+
     // Extract the last path segment as title if available
     try {
       const pathSegments = new URL(url).pathname.split('/').filter(Boolean);
@@ -325,13 +326,13 @@ export default function WebSearchPage() {
           .split(' ')
           .map(word => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
-        
+
         if (lastSegment) return lastSegment;
       }
     } catch (error) {
       // Fallback to domain
     }
-    
+
     return domain;
   };
 
@@ -340,9 +341,9 @@ export default function WebSearchPage() {
       {/* Header */}
       <div className="flex justify-between items-center p-4 border-b">
         <div className="flex items-center">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="mr-2"
             onClick={() => window.history.back()}
           >
@@ -351,9 +352,9 @@ export default function WebSearchPage() {
           <h1 className="text-xl font-bold">Web Search</h1>
         </div>
         <div className="flex items-center space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowMemoryStats(!showMemoryStats)}
           >
             <Brain className="mr-2 h-4 w-4" />
@@ -383,10 +384,10 @@ export default function WebSearchPage() {
                     transition={{ duration: 0.3 }}
                     className={cn(
                       "max-w-[80%] rounded-lg p-4",
-                      message.role === 'user' 
-                        ? "bg-primary text-primary-foreground" 
-                        : message.isError 
-                          ? "bg-destructive/10 border border-destructive/20" 
+                      message.role === 'user'
+                        ? "bg-primary text-primary-foreground"
+                        : message.isError
+                          ? "bg-destructive/10 border border-destructive/20"
                           : "bg-accent"
                     )}
                   >
@@ -399,14 +400,14 @@ export default function WebSearchPage() {
                     ) : (
                       <div className="whitespace-pre-wrap">{message.content}</div>
                     )}
-                    
+
                     <div className="text-xs mt-2 flex items-center justify-between">
                       <span className={cn(
                         message.role === 'user' ? "text-primary-foreground/70" : "text-muted-foreground"
                       )}>
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      
+
                       {message.role === 'assistant' && message.messageId && !message.isError && (
                         <div className="flex items-center space-x-2">
                           {/* Add Sources button if we have searched websites */}
@@ -414,9 +415,9 @@ export default function WebSearchPage() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
                                     className="h-6 w-6"
                                     onClick={() => setActiveMessageId(activeMessageId === message.id ? null : message.id)}
                                   >
@@ -429,14 +430,14 @@ export default function WebSearchPage() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
-                          
+
                           {message.reasoning && message.reasoning.length > 0 && (
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
                                     className="h-6 w-6"
                                     onClick={() => toggleReasoning(message.id)}
                                   >
@@ -449,15 +450,15 @@ export default function WebSearchPage() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
-                          
+
                           {!message.hasFeedback ? (
                             <>
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
                                       className="h-6 w-6"
                                       onClick={() => openFeedbackDialog(message.messageId!, 5)}
                                     >
@@ -469,13 +470,13 @@ export default function WebSearchPage() {
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
-                              
+
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
                                       className="h-6 w-6"
                                       onClick={() => openFeedbackDialog(message.messageId!, 1)}
                                     >
@@ -490,14 +491,14 @@ export default function WebSearchPage() {
                             </>
                           ) : (
                             <span className="text-xs text-muted-foreground flex items-center">
-                              <Check className="h-3 w-3 mr-1" /> 
+                              <Check className="h-3 w-3 mr-1" />
                               Feedback submitted
                             </span>
                           )}
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Reasoning section */}
                     {showReasoning === message.id && message.reasoning && (
                       <motion.div
@@ -519,7 +520,7 @@ export default function WebSearchPage() {
                   </motion.div>
                 </div>
               ))}
-              
+
               {/* Loading indicator */}
               {isLoading && (
                 <div className="flex justify-start">
@@ -578,35 +579,48 @@ export default function WebSearchPage() {
             <div className="p-4 border-b">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold">Sources</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setActiveMessageId(null)}
                 >
                   ✕
                 </Button>
               </div>
             </div>
-            
+
             <ScrollArea className="flex-1">
               <div className="p-4">
                 <div className="space-y-2">
                   {(() => {
                     // Find the active message
                     const activeMessage = messages.find(msg => msg.id === activeMessageId);
-                    if (!activeMessage || !activeMessage.searched_websites || activeMessage.searched_websites.length === 0) {
+                    console.log("Active message:", activeMessage); // Debug logging
+
+                    if (!activeMessage) {
                       return (
                         <div className="text-sm text-muted-foreground p-3">
                           No sources available for this response.
                         </div>
                       );
                     }
-                    
-                    return activeMessage.searched_websites.map((website, idx) => (
+
+                    const websites = activeMessage.searched_websites || [];
+                    console.log("Websites:", websites); // Debug logging
+
+                    if (websites.length === 0) {
+                      return (
+                        <div className="text-sm text-muted-foreground p-3">
+                          No sources available for this response.
+                        </div>
+                      );
+                    }
+
+                    return websites.map((website, idx) => (
                       <Card key={idx} className="overflow-hidden hover:bg-accent transition-colors">
-                        <a 
-                          href={website} 
-                          target="_blank" 
+                        <a
+                          href={website}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="block"
                         >
@@ -642,16 +656,16 @@ export default function WebSearchPage() {
             <div className="p-4 border-b">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold">Memory Statistics</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowMemoryStats(false)}
                 >
                   ✕
                 </Button>
               </div>
             </div>
-            
+
             <ScrollArea className="flex-1">
               <div className="p-4">
                 {memoryStats ? (
@@ -666,14 +680,14 @@ export default function WebSearchPage() {
                         </div>
                       </CardContent>
                     </Card>
-                    
+
                     {memoryStats.topics.length > 0 && (
                       <Card>
                         <CardContent className="p-3">
                           <h4 className="font-medium text-sm mb-2">Knowledge Topics</h4>
                           <div className="flex flex-wrap gap-1">
                             {memoryStats.topics.map((topic, idx) => (
-                              <span 
+                              <span
                                 key={idx}
                                 className="text-xs bg-accent px-2 py-1 rounded-full"
                               >
@@ -684,7 +698,7 @@ export default function WebSearchPage() {
                         </CardContent>
                       </Card>
                     )}
-                    
+
                     {Object.keys(memoryStats.user_profile).length > 0 && (
                       <Card>
                         <CardContent className="p-3">
@@ -693,8 +707,8 @@ export default function WebSearchPage() {
                             {Object.entries(memoryStats.user_profile).map(([key, value], idx) => (
                               <p key={idx}>
                                 <span className="font-medium">{key.replace(/_/g, ' ')}:</span> {
-                                  Array.isArray(value) 
-                                    ? value.join(', ') 
+                                  Array.isArray(value)
+                                    ? value.join(', ')
                                     : String(value)
                                 }
                               </p>
@@ -716,14 +730,14 @@ export default function WebSearchPage() {
           </div>
         )}
       </div>
-      
+
       {/* Feedback Dialog */}
       <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Share your feedback</DialogTitle>
           </DialogHeader>
-          
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onFeedbackSubmit)} className="space-y-4">
               <FormField
@@ -757,7 +771,7 @@ export default function WebSearchPage() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="feedbackText"
@@ -776,11 +790,11 @@ export default function WebSearchPage() {
                   </FormItem>
                 )}
               />
-              
+
               <DialogFooter className="flex gap-2 sm:gap-0">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setFeedbackDialogOpen(false)}
                 >
                   Cancel
