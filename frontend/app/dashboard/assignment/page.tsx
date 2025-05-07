@@ -40,6 +40,10 @@ interface Assignment {
     id: string;
     submittedAt: string;
     fileUrl: string;
+    user: {
+      name: string | null;
+      email: string;
+    };
   }[];
 }
 
@@ -216,74 +220,141 @@ export default function AssignmentPage() {
       <h1 className="text-3xl font-bold mb-6">Assignments</h1>
 
       {role === "teacher" && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Create New Assignment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreateAssignment} className="space-y-4">
-              <div>
-                <Input
-                  placeholder="Assignment Title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Textarea
-                  placeholder="Assignment Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Input
-                  type="datetime-local"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Select
-                  value={formData.courseId}
-                  onValueChange={(value) => setFormData({ ...formData, courseId: value })}
-                  disabled={isLoadingCourses}
+        <>
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Create New Assignment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateAssignment} className="space-y-4">
+                <div>
+                  <Input
+                    placeholder="Assignment Title"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Textarea
+                    placeholder="Assignment Description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Input
+                    type="datetime-local"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Select
+                    value={formData.courseId}
+                    onValueChange={(value) => setFormData({ ...formData, courseId: value })}
+                    disabled={isLoadingCourses}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingCourses ? "Loading courses..." : "Select Course"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courses.map((course) => (
+                        <SelectItem key={course.id} value={course.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <span>{course.name}</span>
+                            {course.isStarred && (
+                              <span className="text-yellow-500">★</span>
+                            )}
+                            <span className="text-sm text-gray-500">
+                              (by {course.createdBy.name || course.createdBy.email})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {courses.length === 0 && !isLoadingCourses && (
+                    <p className="text-sm text-gray-500 mt-2">No courses available.</p>
+                  )}
+                </div>
+                <Button 
+                  type="submit" 
+                  disabled={!formData.courseId || isLoadingCourses}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder={isLoadingCourses ? "Loading courses..." : "Select Course"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <span>{course.name}</span>
-                          {course.isStarred && (
-                            <span className="text-yellow-500">★</span>
-                          )}
-                          <span className="text-sm text-gray-500">
-                            (by {course.createdBy.name || course.createdBy.email})
-                          </span>
+                  Create Assignment
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <TabsList>
+              <TabsTrigger value="all">All Assignments</TabsTrigger>
+              <TabsTrigger value="submissions">Submissions</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {activeTab === "submissions" && (
+            <div className="space-y-6">
+              {assignments.map((assignment) => (
+                assignment.submissions.length > 0 && (
+                  <Card key={assignment.id}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{assignment.title}</CardTitle>
+                          <Badge variant="secondary" className="mt-2">
+                            {assignment.course?.name || "No Course"}
+                          </Badge>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {courses.length === 0 && !isLoadingCourses && (
-                  <p className="text-sm text-gray-500 mt-2">No courses available.</p>
-                )}
-              </div>
-              <Button 
-                type="submit" 
-                disabled={!formData.courseId || isLoadingCourses}
-              >
-                Create Assignment
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                        <div className="text-sm text-gray-500">
+                          Due: {new Date(assignment.dueDate).toLocaleString()}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <p className="text-sm text-gray-500">
+                          Total Submissions: {assignment.submissions.length}
+                        </p>
+                        <div className="space-y-4">
+                          {assignment.submissions.map((submission) => (
+                            <div key={submission.id} className="border rounded-lg p-4">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium">
+                                    Submitted by: {submission.user.name || submission.user.email}
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    Submitted at: {new Date(submission.submittedAt).toLocaleString()}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => window.open(submission.fileUrl, '_blank')}
+                                >
+                                  View Submission
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              ))}
+              {assignments.every(assignment => assignment.submissions.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  No submissions yet
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {role === "student" && (
@@ -366,44 +437,53 @@ export default function AssignmentPage() {
         </>
       )}
 
-      <div className="grid gap-6">
-        {assignments.map((assignment) => (
-          <Card key={assignment.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle>{assignment.title}</CardTitle>
-                  <Badge variant="secondary" className="mt-2">
-                    {assignment.course?.name || "No Course"}
-                  </Badge>
-                </div>
-                <div className="text-sm text-gray-500">
-                  Created by: {assignment.createdBy?.name || "Unknown"}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4">{assignment.description}</p>
-              <div className="flex flex-col gap-2 text-sm text-gray-500">
-                <p>Due: {new Date(assignment.dueDate).toLocaleString()}</p>
-                {assignment.submissions && assignment.submissions.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-green-600">Submitted: {new Date(assignment.submissions[0].submittedAt).toLocaleString()}</p>
-                    <a 
-                      href={assignment.submissions[0].fileUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      View Submission
-                    </a>
+      {activeTab === "all" && (
+        <div className="grid gap-6">
+          {assignments.map((assignment) => (
+            <Card key={assignment.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>{assignment.title}</CardTitle>
+                    <Badge variant="secondary" className="mt-2">
+                      {assignment.course?.name || "No Course"}
+                    </Badge>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  <div className="text-sm text-gray-500">
+                    Created by: {assignment.createdBy?.name || "Unknown"}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-4">{assignment.description}</p>
+                <div className="flex flex-col gap-2 text-sm text-gray-500">
+                  <p>Due: {new Date(assignment.dueDate).toLocaleString()}</p>
+                  {role === "student" && assignment.submissions && assignment.submissions.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-green-600">Submitted: {new Date(assignment.submissions[0].submittedAt).toLocaleString()}</p>
+                      <a 
+                        href={assignment.submissions[0].fileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        View Submission
+                      </a>
+                    </div>
+                  )}
+                  {role === "teacher" && (
+                    <div className="mt-2">
+                      <p className="text-blue-600">
+                        Submissions: {assignment.submissions.length}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

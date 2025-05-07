@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import prisma from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -11,37 +11,35 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch all assignments with their details
     const assignments = await prisma.assignment.findMany({
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        dueDate: true,
+      include: {
         course: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         createdBy: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         submissions: {
-          where: {
-            userId: user.id
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
           },
-          select: {
-            id: true,
-            submittedAt: true,
-            fileUrl: true
-          }
-        }
+          orderBy: {
+            submittedAt: 'desc',
+          },
+        },
       },
       orderBy: {
-        dueDate: 'asc'
-      }
+        dueDate: 'asc',
+      },
     });
 
     return NextResponse.json(assignments);
