@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, FileWarning } from "lucide-react";
 
 interface Course {
   id: number;
@@ -41,10 +43,29 @@ interface Assignment {
     submittedAt: string;
     fileUrl: string;
     user: {
+      id: string;
       name: string | null;
       email: string;
     };
   }[];
+}
+
+interface SimilarityResult {
+  submission1: {
+    id: string;
+    userId: string;
+    userName: string | null;
+    userEmail: string;
+    submittedAt: string;
+  };
+  submission2: {
+    id: string;
+    userId: string;
+    userName: string | null;
+    userEmail: string;
+    submittedAt: string;
+  };
+  similarity: number;
 }
 
 export default function AssignmentPage() {
@@ -57,6 +78,8 @@ export default function AssignmentPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedAssignment, setSelectedAssignment] = useState<string>("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [similarityResults, setSimilarityResults] = useState<SimilarityResult[]>([]);
+  const [isCheckingSimilarity, setIsCheckingSimilarity] = useState(false);
 
   // Form state for teachers
   const [formData, setFormData] = useState({
@@ -208,6 +231,46 @@ export default function AssignmentPage() {
     }
   };
 
+  const checkSimilarity = async (assignmentId: string) => {
+    setIsCheckingSimilarity(true);
+    try {
+      const assignment = assignments.find(a => a.id === assignmentId);
+      if (!assignment || assignment.submissions.length < 2) {
+        toast.error("Need at least 2 submissions to check similarity");
+        return;
+      }
+
+      const submissions = assignment.submissions.map(sub => ({
+        id: sub.id,
+        userId: sub.user.id,
+        userName: sub.user.name,
+        userEmail: sub.user.email,
+        submittedAt: sub.submittedAt,
+        fileUrl: sub.fileUrl
+      }));
+
+      const response = await fetch('http://localhost:5000/check-similarity', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ submissions }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check similarity');
+      }
+
+      const data = await response.json();
+      setSimilarityResults(data.results);
+    } catch (error) {
+      console.error('Error checking similarity:', error);
+      toast.error('Failed to check similarity');
+    } finally {
+      setIsCheckingSimilarity(false);
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -300,26 +363,83 @@ export default function AssignmentPage() {
           {activeTab === "submissions" && (
             <div className="space-y-6">
               {assignments.map((assignment) => (
-                assignment.submissions.length > 0 && (
-                  <Card key={assignment.id}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>{assignment.title}</CardTitle>
-                          <Badge variant="secondary" className="mt-2">
-                            {assignment.course?.name || "No Course"}
-                          </Badge>
-                        </div>
+                <Card key={assignment.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{assignment.title}</CardTitle>
+                        <Badge variant="secondary" className="mt-2">
+                          {assignment.course?.name || "No Course"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4">
                         <div className="text-sm text-gray-500">
                           Due: {new Date(assignment.dueDate).toLocaleString()}
                         </div>
+                        {assignment.submissions.length >= 2 && (
+                          <Button
+                            variant="outline"
+                            onClick={() => checkSimilarity(assignment.id)}
+                            disabled={isCheckingSimilarity}
+                          >
+                            {isCheckingSimilarity ? "Checking..." : "Check Similarity"}
+                          </Button>
+                        )}
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
                         <p className="text-sm text-gray-500">
                           Total Submissions: {assignment.submissions.length}
                         </p>
+                        {assignment.submissions.length === 0 && (
+                          <p className="text-sm text-gray-500">No submissions yet</p>
+                        )}
+                      </div>
+
+                      {/* Similarity Results */}
+                      {similarityResults.length > 0 && (
+                        <div className="space-y-4">
+                          <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Potential Plagiarism Detected</AlertTitle>
+                            <AlertDescription>
+                              Found {similarityResults.length} pairs of submissions with high similarity
+                            </AlertDescription>
+                          </Alert>
+                          {similarityResults.map((result, index) => (
+                            <div key={index} className="border rounded-lg p-4 bg-red-50">
+                              <div className="flex items-center gap-2 mb-2">
+                                <FileWarning className="h-4 w-4 text-red-500" />
+                                <span className="font-medium text-red-700">
+                                  Similarity: {(result.similarity * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="font-medium">Student 1:</p>
+                                  <p>{result.submission1.userName || result.submission1.userEmail}</p>
+                                  <p className="text-sm text-gray-500">
+                                    Submitted: {new Date(result.submission1.submittedAt).toLocaleString()}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="font-medium">Student 2:</p>
+                                  <p>{result.submission2.userName || result.submission2.userEmail}</p>
+                                  <p className="text-sm text-gray-500">
+                                    Submitted: {new Date(result.submission2.submittedAt).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Submissions List */}
+                      {assignment.submissions.length > 0 && (
                         <div className="space-y-4">
                           {assignment.submissions.map((submission) => (
                             <div key={submission.id} className="border rounded-lg p-4">
@@ -342,16 +462,44 @@ export default function AssignmentPage() {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-              {assignments.every(assignment => assignment.submissions.length === 0) && (
-                <div className="text-center py-8 text-gray-500">
-                  No submissions yet
-                </div>
-              )}
+            </div>
+          )}
+
+          {activeTab === "all" && (
+            <div className="grid gap-6">
+              {assignments.map((assignment) => (
+                <Card key={assignment.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{assignment.title}</CardTitle>
+                        <Badge variant="secondary" className="mt-2">
+                          {assignment.course?.name || "No Course"}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Created by: {assignment.createdBy?.name || "Unknown"}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="mb-4">{assignment.description}</p>
+                    <div className="flex flex-col gap-2 text-sm text-gray-500">
+                      <p>Due: {new Date(assignment.dueDate).toLocaleString()}</p>
+                      <div className="mt-2">
+                        <p className="text-blue-600">
+                          Submissions: {assignment.submissions.length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </>
@@ -435,54 +583,6 @@ export default function AssignmentPage() {
             </TabsList>
           </Tabs>
         </>
-      )}
-
-      {activeTab === "all" && (
-        <div className="grid gap-6">
-          {assignments.map((assignment) => (
-            <Card key={assignment.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{assignment.title}</CardTitle>
-                    <Badge variant="secondary" className="mt-2">
-                      {assignment.course?.name || "No Course"}
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Created by: {assignment.createdBy?.name || "Unknown"}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-4">{assignment.description}</p>
-                <div className="flex flex-col gap-2 text-sm text-gray-500">
-                  <p>Due: {new Date(assignment.dueDate).toLocaleString()}</p>
-                  {role === "student" && assignment.submissions && assignment.submissions.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-green-600">Submitted: {new Date(assignment.submissions[0].submittedAt).toLocaleString()}</p>
-                      <a 
-                        href={assignment.submissions[0].fileUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        View Submission
-                      </a>
-                    </div>
-                  )}
-                  {role === "teacher" && (
-                    <div className="mt-2">
-                      <p className="text-blue-600">
-                        Submissions: {assignment.submissions.length}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       )}
     </div>
   );

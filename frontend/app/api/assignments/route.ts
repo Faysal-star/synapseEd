@@ -11,6 +11,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user profile to check role
+    const profile = await prisma.profile.findUnique({
+      where: { email: user.email },
+    });
+
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+
+    // Fetch assignments with submissions
     const assignments = await prisma.assignment.findMany({
       include: {
         course: {
@@ -27,6 +37,7 @@ export async function GET(request: Request) {
           include: {
             user: {
               select: {
+                id: true,
                 name: true,
                 email: true,
               },
@@ -35,6 +46,12 @@ export async function GET(request: Request) {
           orderBy: {
             submittedAt: 'desc',
           },
+          // Only filter submissions for students
+          ...(profile.role === "student" ? {
+            where: {
+              userId: profile.id
+            }
+          } : {})
         },
       },
       orderBy: {
