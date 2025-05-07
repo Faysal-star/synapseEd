@@ -236,23 +236,24 @@ For detailed API specifications and schema definitions, visit our [API Documenta
 
 1. **Prerequisites**
    ```bash
-   Node.js >= 18
-   Python >= 3.10
+   Node.js >= 20
+   Python >= 3.11
    ```
 
 2. **Frontend Setup**
    ```bash
    cd frontend
    pnpm install
-   pnpm run dev
+   pnpm run dev:all
    ```
 
 3. **Backend Setup**
    ```bash
    cd agents
-   python -m venv venv
+   python -m venv .venv
    source venv/bin/activate  # or `venv\Scripts\activate` on Windows
    pip install -r requirements.txt
+   python app.py #Run the app
    ```
 
 4. **Environment Configuration**
@@ -260,6 +261,10 @@ For detailed API specifications and schema definitions, visit our [API Documenta
    cp .env.example .env
    # Configure your environment variables
    ```
+
+5. **Site Link**
+
+The site will run on `http://localhost:3000` for the frontend and `http://localhost:5000` for the backend.
 
 
 <div align="center">
