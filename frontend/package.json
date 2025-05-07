@@ -2,13 +2,18 @@
   "name": "synapseed-project",
   "version": "0.1.0",
   "private": true,
+  "main": "main/main.js",
+  "author": "Synapseed",
+  "description": "AI Shadow Education platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "socket": "tsx server.ts",
-    "dev:all": "concurrently \"pnpm run dev\" \"pnpm run socket\""
+    "dev:all": "concurrently \"pnpm run dev\" \"pnpm run socket\"",
+    "electron:dev":  "concurrently -n \"NEXT,ELECTRON\" -c \"yellow,blue\" --kill-others \"next dev\" \"electron .\"",
+    "electron:build": "next build && electron-builder"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
@@ -57,6 +62,7 @@
     "cmdk": "1.0.4",
     "concurrently": "^9.1.2",
     "date-fns": "4.1.0",
+    "electron-serve": "^2.1.1",
     "embla-carousel-react": "8.5.1",
     "face-api.js": "^0.22.2",
     "framer-motion": "latest",
@@ -93,6 +99,8 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^36.1.0",
+    "electron-builder": "^26.0.12",
     "postcss": "^8",
     "prisma": "^6.7.0",
     "tailwindcss": "^3.4.17",
