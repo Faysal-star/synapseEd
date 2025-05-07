@@ -24,7 +24,7 @@ model Profile {
   bio           String?
   institution   String?
   createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @default(now()) @map("updated_at")
+  updatedAt     DateTime?  @updatedAt @default(now()) @map("updated_at")
   
   // Relations
   examResults   ExamResult[]
@@ -90,7 +90,7 @@ model Topic {
   name        String
   description String
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime?  @updatedAt @map("updated_at")
   
   // Relations
   resources   Resource[]
@@ -109,7 +109,7 @@ model Exam {
   subject         String      // Added subject property
   topic           String      // Added topic property as a string field
   createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  updatedAt       DateTime?    @updatedAt @map("updated_at")
   createdById     String      @map("created_by_id")
   courseId        Int?        @map("course_id") // Changed to Int? to match Course.id type
   topicId         String?     @map("topic_id")
@@ -138,7 +138,7 @@ model Question {
   category     String?
   examId       String       @map("exam_id")
   createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  updatedAt    DateTime?     @updatedAt @map("updated_at")
   
   // Relations
   exam         Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
@@ -193,7 +193,7 @@ model Disqualification {
   reason      String
   timestamp   DateTime  @default(now())
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime?  @updatedAt @map("updated_at")
   
   // Relations
   user        Profile   @relation(fields: [userId], references: [id])
@@ -214,7 +214,7 @@ model Resource {
   examId      String?   @map("exam_id")
   topicId     String?   @map("topic_id")
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime?  @updatedAt @map("updated_at")
   
   // Relations
   uploadedBy  Profile   @relation(fields: [uploadedById], references: [id])
@@ -236,7 +236,7 @@ model LecturePlan {
   createdById String    @map("created_by")
   courseId    Int?      @map("course_id")  // Changed to Int? to match Course.id type
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime?  @updatedAt @map("updated_at")
   
   // Relations
   createdBy   Profile   @relation(fields: [createdById], references: [id])

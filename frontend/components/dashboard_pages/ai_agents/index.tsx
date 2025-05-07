@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Search, SendHorizontal, Wand2, Globe, SquarePen, Brain, Sparkles, Lightbulb, AlertCircle, ThumbsUp, ThumbsDown, Check, Info } from "lucide-react";
+import { Search,FileText, SendHorizontal, Wand2, Globe, SquarePen, Brain, Sparkles, Lightbulb, AlertCircle, ThumbsUp, ThumbsDown, Check, Info, BookOpen } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,6 +18,8 @@ import rehypeRaw from 'rehype-raw';
 import QuestionGenerationPage from '@/components/dashboard_pages/ai_agents/question_generation/page';
 import WebSearchPage from '@/components/dashboard_pages/ai_agents/web_search/page';
 import LecturePlannerPage from '@/components/dashboard_pages/ai_agents/lecture_planner/page';
+import StudySupportPage from '@/components/dashboard_pages/ai_agents/study_support/page';
+import ContentGenerationPage from '@/components/dashboard_pages/ai_agents/content-generation/page';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -77,8 +79,10 @@ export default function AIAgentsPage() {
   const [initialRating, setInitialRating] = useState<number>(3);
   const [conversationId, setConversationId] = useState<string>('');
 
-  // Inside the component, add a state for lecture planner
+  // State for all specialized interfaces
   const [showLecturePlanner, setShowLecturePlanner] = useState(false);
+  const [showStudySupport, setShowStudySupport] = useState(false);
+  const [showContentGenerator, setShowContentGenerator] = useState(false);
 
   // Create form
   const form = useForm<FeedbackFormValues>({
@@ -108,6 +112,12 @@ export default function AIAgentsPage() {
       name: 'Smart Counselor',
       icon: <Brain className="h-5 w-5" />,
       description: 'Get guidance on personal and academic challenges'
+    },
+    {
+      id: 'study-support',
+      name: 'Study Support',
+      icon: <BookOpen className="h-5 w-5" />,
+      description: 'Get help with academic subjects and homework'
     },
     ...(userType === 'teacher' ? [
       {
@@ -156,6 +166,8 @@ export default function AIAgentsPage() {
     setShowQuestionGenerator(false);
     setShowWebSearch(false);
     setShowLecturePlanner(false);
+    setShowStudySupport(false);
+    setShowContentGenerator(false);
   }, [activeAgent]);
 
   // Get welcome message based on agent
@@ -167,6 +179,8 @@ export default function AIAgentsPage() {
         return "I can search the web for current information and resources. What would you like to know more about?";
       case 'smart-counselor':
         return "How can I help you today? I'm here to discuss any academic or personal challenges you might be facing.";
+      case 'study-support':
+        return "Hello! I'm your AI Study Support Assistant. Ask me any academic questions and I'll do my best to help you learn.";
       case 'lecture-planner':
         return "I'll help you create structured lesson plans tailored to your curriculum. What subject and grade level are you planning for?";
       default:
@@ -309,14 +323,11 @@ export default function AIAgentsPage() {
         console.error('Error sending message to API:', error);
         
         // Show error toast
-        if (typeof window !== 'undefined' && window.document && 'toast' in window) {
-          // @ts-ignore
-          toast({
-            title: "API Connection Error",
-            description: "Failed to connect to the search backend. Using mock response instead.",
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "API Connection Error",
+          description: "Failed to connect to the search backend. Using mock response instead.",
+          variant: "destructive"
+        });
         
         // Fallback to mock response if API call fails
         const agentResponse = generateAgentResponse(activeAgent, inputValue);
@@ -330,6 +341,125 @@ export default function AIAgentsPage() {
         };
         
         setMessages(prev => [...prev, newAssistantMessage]);
+        setIsLoading(false);
+      }
+    } else if (activeAgent === 'study-support') {
+      // Study support uses its own API
+      try {
+        const response = await fetch("/api/study-support", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: inputValue }),
+        });
+        
+        if (!response.ok) {
+          throw new Error("Failed to get response from study support API");
+        }
+        
+        const data = await response.json();
+        
+        const newAssistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.answer || "Sorry, I couldn't process that request.",
+          timestamp: new Date(),
+          isMarkdown: true,
+          // Include additional resources if available
+          reasoning: data.additionalResources ? [{
+            type: "Resources",
+            content: data.additionalResources.join(", ")
+          }] : undefined
+        };
+        
+        setMessages(prev => [...prev, newAssistantMessage]);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error sending message to study support API:', error);
+        
+        // Show error toast
+        toast({
+          title: "API Error",
+          description: "Failed to connect to the study support service. Please try again.",
+          variant: "destructive"
+        });
+        
+        // Add error message
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: "Sorry, I encountered an error processing your request. Please try again later.",
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, errorMessage]);
+        setIsLoading(false);
+      }
+    } else if (activeAgent === 'content-generator') {
+      // Content generation uses its own API
+      try {
+        const response = await fetch("/api/content-generation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic: inputValue }),
+        });
+        
+        if (!response.ok) {
+          throw new Error("Failed to get response from content generation API");
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        // Store the generated content in localStorage to access it in the dedicated interface
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastGeneratedContent', JSON.stringify(data));
+          localStorage.setItem('lastGeneratedTopic', inputValue);
+        }
+        
+        const newAssistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: "I've created educational content on this topic! You can now view or download it as a PDF document.",
+          timestamp: new Date(),
+          isMarkdown: true
+        };
+        
+        setMessages(prev => [...prev, newAssistantMessage]);
+        
+        // Show toast with option to open content generator
+        toast({
+          title: "Content generated successfully",
+          description: "Click 'Open' to view and download your content",
+          action: (
+            <Button size="sm" onClick={() => setShowContentGenerator(true)}>
+              Open
+            </Button>
+          )
+        });
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error sending message to content generation API:', error);
+        
+        // Show error toast
+        toast({
+          title: "Content Generation Error",
+          description: error instanceof Error ? error.message : "Failed to generate content. Please try again.",
+          variant: "destructive"
+        });
+        
+        // Add error message
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: "Sorry, I encountered an error generating the content. Please try again later.",
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, errorMessage]);
         setIsLoading(false);
       }
     } else {
@@ -354,14 +484,16 @@ export default function AIAgentsPage() {
   // Mock response generation - would be replaced with actual API calls
   const generateAgentResponse = (agentId: string, query: string) => {
     switch (agentId) {
-      case 'content-generator':
-        return `Here's a draft content based on your request: "${query}"\n\n[Generated content would appear here based on the actual implementation]`;
+      case 'study-support':
+        return `Based on your question about "${query}", I recommend reviewing the following concepts...`;
       case 'web-search':
         return `[MOCK RESPONSE - API CONNECTION FAILED]\n\nI searched for information about "${query}"\n\nHere are some relevant results: \n1. [Result 1 description]\n2. [Result 2 description]\n3. [Result 3 description]`;
       case 'smart-counselor':
         return `Thank you for sharing that. Based on what you've told me about "${query}", I would suggest...\n\n[Personalized guidance would appear here]`;
       case 'lecture-planner':
         return `I've created a lesson plan outline for "${query}"\n\n**Lesson Objectives:**\n- Objective 1\n- Objective 2\n\n**Activities:**\n1. Opening activity (10 min)\n2. Main instruction (25 min)\n3. Group work (15 min)\n4. Assessment (10 min)`;
+      case 'content-generator':
+        return `I'd be happy to create educational content about "${query}". Please click the "Launch Content Generator" button in the sidebar to use the full interface.`;
       default:
         return "I'm not sure how to respond to that. Can you try a different question?";
     }
@@ -375,11 +507,15 @@ export default function AIAgentsPage() {
         <div className="flex items-center space-x-2">
           {(showQuestionGenerator && activeAgent === 'question-generation') || 
            (showWebSearch && activeAgent === 'web-search') ||
-           (showLecturePlanner && activeAgent === 'lecture-planner') ? (
+           (showLecturePlanner && activeAgent === 'lecture-planner') ||
+           (showStudySupport && activeAgent === 'study-support') ||
+           (showContentGenerator && activeAgent === 'content-generator') ? (
             <Button variant="outline" size="sm" onClick={() => {
               setShowQuestionGenerator(false);
               setShowWebSearch(false);
               setShowLecturePlanner(false);
+              setShowStudySupport(false);
+              setShowContentGenerator(false);
             }}>
               Back to Agents
             </Button>
@@ -403,6 +539,14 @@ export default function AIAgentsPage() {
       ) : showLecturePlanner && activeAgent === 'lecture-planner' ? (
         <div className="flex-1 overflow-y-auto">
           <LecturePlannerPage />
+        </div>
+      ) : showStudySupport && activeAgent === 'study-support' ? (
+        <div className="flex-1 overflow-y-auto">
+          <StudySupportPage />
+        </div>
+      ) : showContentGenerator && activeAgent === 'content-generator' ? (
+        <div className="flex-1 overflow-y-auto">
+          <ContentGenerationPage />
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
@@ -589,8 +733,28 @@ export default function AIAgentsPage() {
                           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         
-                        {activeAgent === 'web-search' && message.role === 'assistant' && message.messageId && (
+                        {message.role === 'assistant' && (
                           <div className="flex items-center space-x-1">
+                            {activeAgent === 'content-generator' && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-6 w-6"
+                                      onClick={() => setShowContentGenerator(true)}
+                                    >
+                                      <FileText className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>View generated content</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            
                             {message.reasoning && message.reasoning.length > 0 && (
                               <TooltipProvider>
                                 <Tooltip>
@@ -611,7 +775,7 @@ export default function AIAgentsPage() {
                               </TooltipProvider>
                             )}
                             
-                            {!message.hasFeedback ? (
+                            {activeAgent === 'web-search' && message.messageId && !message.hasFeedback ? (
                               <>
                                 <TooltipProvider>
                                   <Tooltip>
@@ -649,12 +813,12 @@ export default function AIAgentsPage() {
                                   </Tooltip>
                                 </TooltipProvider>
                               </>
-                            ) : (
+                            ) : message.hasFeedback ? (
                               <span className="text-xs text-muted-foreground flex items-center">
                                 <Check className="h-3 w-3 mr-1" /> 
                                 Feedback submitted
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -768,24 +932,47 @@ export default function AIAgentsPage() {
               {activeAgent === 'content-generator' && (
                 <div className="space-y-3">
                   {/* Content Generator section */}
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowContentGenerator(true)}
+                  >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Create lesson materials</h4>
                       <p className="text-xs text-muted-foreground">Generate handouts, slides, and resources</p>
                     </CardContent>
                   </Card>
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowContentGenerator(true)}
+                  >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Assignment generator</h4>
                       <p className="text-xs text-muted-foreground">Create custom homework and assignments</p>
                     </CardContent>
                   </Card>
-                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowContentGenerator(true)}
+                  >
                     <CardContent className="p-3">
                       <h4 className="font-medium text-sm">Interactive activities</h4>
                       <p className="text-xs text-muted-foreground">Create engaging class activities</p>
                     </CardContent>
                   </Card>
+                  
+                  {/* Launch content generator button */}
+                  <div className="mt-6">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setShowContentGenerator(true)}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Launch Content Generator
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Create comprehensive educational materials
+                    </p>
+                  </div>
                 </div>
               )}
               
@@ -857,6 +1044,53 @@ export default function AIAgentsPage() {
                       <p className="text-xs text-muted-foreground">Support for learning styles</p>
                     </CardContent>
                   </Card>
+                </div>
+              )}
+              
+              {activeAgent === 'study-support' && (
+                <div className="space-y-3">
+                  {/* Study Support section */}
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowStudySupport(true)}
+                  >
+                    <CardContent className="p-3">
+                      <h4 className="font-medium text-sm">Mathematics Help</h4>
+                      <p className="text-xs text-muted-foreground">Get help with math problems</p>
+                    </CardContent>
+                  </Card>
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowStudySupport(true)}
+                  >
+                    <CardContent className="p-3">
+                      <h4 className="font-medium text-sm">Computer Science</h4>
+                      <p className="text-xs text-muted-foreground">Programming and algorithm assistance</p>
+                    </CardContent>
+                  </Card>
+                  <Card 
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => setShowStudySupport(true)}
+                  >
+                    <CardContent className="p-3">
+                      <h4 className="font-medium text-sm">Science Topics</h4>
+                      <p className="text-xs text-muted-foreground">Physics, chemistry, biology help</p>
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Launch full study support interface */}
+                  <div className="mt-6">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setShowStudySupport(true)}
+                    >
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Launch Study Assistant
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Open dedicated learning interface
+                    </p>
+                  </div>
                 </div>
               )}
               

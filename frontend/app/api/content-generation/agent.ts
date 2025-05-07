@@ -1,0 +1,319 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import PDFDocument from 'pdfkit';
+import { Readable } from 'stream';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+
+// Content topic classification function
+async function classifyTopic(topic: string) {
+  try {
+    const classifierModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const classifierPrompt = `
+      You are an educational content classifier.
+      
+      Analyze the following topic request and classify it by:
+      1. Subject area - Be specific (e.g., "Algebra", "Organic Chemistry", "European History")
+      2. Academic level - (primary, secondary, undergraduate, postgraduate, professional)
+      3. Key concepts that should be included
+      4. Suggested structure for a comprehensive guide on this topic
+      
+      Output ONLY valid JSON in this format:
+      {
+        "subjectArea": "specific subject",
+        "academicLevel": "primary|secondary|undergraduate|postgraduate|professional",
+        "keyConcepts": ["concept1", "concept2", "concept3"],
+        "suggestedStructure": ["section1", "section2", "section3"]
+      }
+      
+      Topic: ${topic}
+    `;
+    
+    const classifierResponse = await classifierModel.generateContent({
+      contents: [{ role: "user", parts: [{ text: classifierPrompt }] }]
+    });
+    
+    const classifierText = classifierResponse.response.text();
+    
+    // Extract JSON from response
+    const jsonMatch = classifierText.match(/\{[\s\S]*\}/);
+    const jsonString = jsonMatch ? jsonMatch[0] : classifierText;
+    
+    const classification = JSON.parse(jsonString);
+    console.log("Topic classification:", classification);
+    
+    return classification;
+  } catch (error) {
+    console.error("Error classifying topic:", error);
+    return {
+      subjectArea: "General",
+      academicLevel: "undergraduate",
+      keyConcepts: [],
+      suggestedStructure: ["Introduction", "Main Content", "Conclusion"]
+    };
+  }
+}
+
+const contentGenerationPrompt = `
+You are SynapseEd's Content Generation Assistant. Your task is to create comprehensive, well-structured educational content on requested topics. This content will be converted to a PDF guide.
+
+CONTENT GUIDELINES:
+1. Be thorough and academically accurate
+2. Structure content with clear headings and subheadings
+3. Include examples, explanations, and practical applications where appropriate
+4. Use markdown formatting:
+   - # for main title
+   - ## for section headings
+   - ### for subsection headings
+   - **bold** for emphasis
+   - *italic* for terms or definitions
+   - - for bullet points
+   - 1. for numbered lists
+   - > for quotes or important notes
+5. Begin with a table of contents
+6. Include a brief introduction explaining the topic's importance
+7. Explain core concepts clearly with examples
+8. Include diagrams or illustrations where helpful (described in markdown)
+9. End with a summary and suggestions for further learning
+10. Reference key sources or further reading materials
+11. Target the content to the appropriate academic level
+12. Avoid using complex jargon without explanation
+13. Cover all key concepts identified in the classification
+
+OUTPUT FORMAT:
+Your response should be a complete, well-formatted markdown document with the following structure:
+
+# [Title]
+
+## Table of Contents
+- [Introduction](#introduction)
+- [Section 1](#section-1)
+  - [Subsection 1.1](#subsection-1-1)
+  - [Subsection 1.2](#subsection-1-2)
+- [Section 2](#section-2)
+- [Conclusion](#conclusion)
+- [Further Reading](#further-reading)
+
+## Introduction
+[Introduction content]
+
+... (and so on with all sections)
+
+## Further Reading
+[List of resources]
+`;
+
+// Convert markdown to a streamable PDF
+async function markdownToPdf(markdown: string, title: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create PDF document
+        const doc = new PDFDocument({
+          margins: {
+            top: 50,
+            bottom: 50,
+            left: 72,
+            right: 72
+          },
+          info: {
+            Title: title,
+            Author: 'SynapseEd Content Generator',
+            Subject: title,
+            Keywords: 'education, guide, synapseEd'
+          }
+        });
+        
+        // Collect PDF data chunks - Fix for "Parameter 'chunk' implicitly has an 'any' type"
+        const chunks: Buffer[] = [];
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+      
+      // Parse markdown sections
+      const lines = markdown.split('\n');
+      let currentY = 50;
+      let pageNumber = 1;
+      
+      // Set up fonts
+      doc.font('Helvetica-Bold').fontSize(24).text(title, { align: 'center' });
+      currentY = doc.y + 20;
+      
+      // Add generation info
+      doc.font('Helvetica-Italic').fontSize(12)
+        .text(`Generated by SynapseEd on ${new Date().toLocaleDateString()}`, { align: 'center' });
+      currentY = doc.y + 30;
+      
+      // Process markdown lines
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Handle headings
+        if (line.startsWith('# ')) {
+          if (doc.y > 700) doc.addPage();
+          doc.font('Helvetica-Bold').fontSize(22).text(line.substring(2), { align: 'left' });
+          doc.moveDown();
+        } 
+        else if (line.startsWith('## ')) {
+          if (doc.y > 700) doc.addPage();
+          doc.font('Helvetica-Bold').fontSize(18).text(line.substring(3), { align: 'left' });
+          doc.moveDown();
+        } 
+        else if (line.startsWith('### ')) {
+          if (doc.y > 700) doc.addPage();
+          doc.font('Helvetica-Bold').fontSize(16).text(line.substring(4), { align: 'left' });
+          doc.moveDown();
+        } 
+        // Handle bullet points
+        else if (line.startsWith('- ')) {
+          if (doc.y > 700) doc.addPage();
+          doc.font('Helvetica').fontSize(12);
+          doc.text(` • ${line.substring(2)}`, { indent: 20 });
+          doc.moveDown(0.5);
+        } 
+        // Handle numbered lists
+        else if (/^\d+\./.test(line)) {
+          if (doc.y > 700) doc.addPage();
+          doc.font('Helvetica').fontSize(12);
+          doc.text(`${line}`, { indent: 20 });
+          doc.moveDown(0.5);
+        } 
+        // Handle blockquotes
+        else if (line.startsWith('> ')) {
+          if (doc.y > 700) doc.addPage();
+          doc.font('Helvetica-Oblique').fontSize(12);
+          doc.text(line.substring(2), { 
+            indent: 20,
+            paragraphGap: 10
+          });
+          doc.moveDown();
+        } 
+        // Handle empty lines
+        else if (line.trim() === '') {
+          doc.moveDown(0.5);
+        } 
+        // Handle regular text
+        else {
+          if (doc.y > 700) doc.addPage();
+          
+          // Process bold and italic within text
+          let textWithFormatting = line;
+          let boldSegments = line.match(/\*\*(.*?)\*\*/g);
+          let italicSegments = line.match(/\*(.*?)\*/g);
+          
+          if (!boldSegments && !italicSegments) {
+            doc.font('Helvetica').fontSize(12).text(line);
+          } else {
+            // This is simplified - in a real app you'd need more sophisticated markdown parsing
+            doc.font('Helvetica').fontSize(12).text(
+              line.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')
+            );
+          }
+          
+          if (i < lines.length - 1 && !lines[i+1].startsWith('#') && lines[i+1].trim() !== '') {
+            doc.moveDown(0.5);
+          } else {
+            doc.moveDown();
+          }
+        }
+      }
+      
+      // Add page numbers
+      const totalPages = doc.bufferedPageRange().count;
+      for (let i = 0; i < totalPages; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(10).text(
+          `Page ${i + 1} of ${totalPages}`,
+          doc.page.margins.left,
+          doc.page.height - 50,
+          { align: 'center' }
+        );
+      }
+      
+      // Finalize the PDF
+      doc.end();
+    } catch (err) {
+      console.error("Error creating PDF:", err);
+      reject(err);
+    }
+  });
+}
+
+export async function generateContent(topic: string) {
+  const startTime = Date.now();
+  try {
+    // First classify the topic
+    const classification = await classifyTopic(topic);
+    
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        temperature: 0.3,       // Slightly creative but mostly factual
+        topP: 0.8,              // More focused token distribution
+        maxOutputTokens: 8192,  // Allow for longer documents
+      }
+    });
+    
+    console.log("Sending content generation query to Gemini API...");
+    
+    // Create an enhanced prompt with the classification
+    const enhancedPrompt = `
+${contentGenerationPrompt}
+
+TOPIC ANALYSIS:
+- Subject Area: ${classification.subjectArea}
+- Academic Level: ${classification.academicLevel}
+- Key Concepts to Include: ${classification.keyConcepts.join(", ")}
+- Suggested Structure: ${classification.suggestedStructure.join(" → ")}
+
+TASK:
+Create a comprehensive educational guide on the topic: "${topic}"
+The guide should be suitable for ${classification.academicLevel} level students.
+Follow the suggested structure if appropriate: ${classification.suggestedStructure.join(" → ")}
+Cover these key concepts: ${classification.keyConcepts.join(", ")}
+
+Return the complete guide as a well-formatted markdown document.
+`;
+    
+    const response = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: enhancedPrompt }] }]
+    });
+    
+    const markdownContent = response.response.text();
+    console.log("Content generation complete, converting to PDF...");
+    
+    // Generate a clean title for the PDF
+    const title = `Guide to ${topic}`;
+    
+    // Generate PDF from the markdown content
+    const pdfBuffer = await markdownToPdf(markdownContent, title);
+    
+    // Create metadata about the generated content
+    const metadata = {
+      title: title,
+      subjectArea: classification.subjectArea,
+      academicLevel: classification.academicLevel,
+      keyConcepts: classification.keyConcepts,
+      sections: classification.suggestedStructure,
+      pageCount: Math.ceil(markdownContent.length / 3000), // Rough estimate
+      wordCount: markdownContent.split(/\s+/).length,
+      processingTimeMs: Date.now() - startTime
+    };
+    
+    return {
+      markdown: markdownContent,
+      pdfBuffer: pdfBuffer.toString('base64'),
+      metadata,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error: any) {
+    console.error("Error with content generation:", error);
+    
+    return {
+      error: `Error generating content: ${error.message}`,
+      markdown: null,
+      pdfBuffer: null,
+      metadata: null,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
