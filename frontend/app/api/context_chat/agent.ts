@@ -1,18 +1,23 @@
-import { NextRequest } from "next/server";
-import { OpenAIEmbeddings } from "@langchain/openai";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { OpenAI } from "@langchain/openai";
-import { RunnableSequence } from "@langchain/core/runnables";
-import { FaissStore } from "@langchain/community/vectorstores/faiss";
-import { Document } from "@langchain/core/documents";
+// Import necessary modules
+import { ChatOpenAI } from "@langchain/openai";
 import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
-import os from "os";
-import fs from "fs";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { CharacterTextSplitter } from "@langchain/textsplitters";
+import { Document } from "@langchain/core/documents";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { v4 as uuidv4 } from 'uuid';
 
-// Store the vector store in memory for the session
-let vectorStore: FaissStore | null = null;
+// Simple in-memory storage for document chunks
+type DocumentChunk = {
+  content: string;
+  metadata: Record<string, any>;
+};
+
+// Store document chunks in memory
+let documentChunks: DocumentChunk[] = [];
 
 export type PDFMessage = {
   type: "human" | "ai";
@@ -23,91 +28,142 @@ export type PDFQuery = {
   pdfUrl?: string;
   pdfBlobUrl?: string;
   pdfName?: string;
-  supabaseUrl?: string; // Add support for Supabase URL
+  supabaseUrl?: string;
   query: string;
 };
 
-// Handle file uploads (receive ArrayBuffer and save to disk temporarily)
-async function handleFileUpload(
-  pdfBlob: Blob,
-  pdfName: string
-): Promise<string> {
-  const arrayBuffer = await pdfBlob.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+// Process a URL directly and store content in memory using LangChain's PDFLoader
+async function processURLDirectly(url: string): Promise<boolean> {
+  console.log("Processing PDF from URL: ", url);
   
-  const tempDir = os.tmpdir();
-  const filePath = path.join(tempDir, pdfName);
-  
-  await writeFile(filePath, buffer);
-  return filePath;
-}
-
-// Simple PDF loader using pdf-parse
-async function loadPDFDocuments(filePath: string): Promise<Document[]> {
-  const pdfParse = await import('pdf-parse');
-  const dataBuffer = fs.readFileSync(filePath);
-  const result = await pdfParse.default(dataBuffer);
-  
-  // Create a document with the PDF content
-  return [
-    new Document({
-      pageContent: result.text,
-      metadata: {
-        source: filePath,
-        pdf_numpages: result.numpages,
-      },
-    }),
-  ];
-}
-
-// Process a PDF file and create a vector store
-export async function processPDF(
-  pdfPath: string,
-  openAIApiKey: string,
-  onProgress?: (progress: number) => void
-): Promise<FaissStore> {
   try {
-    // Load the PDF
-    const docs = await loadPDFDocuments(pdfPath);
-
-    // Split the document into chunks for processing
-    const textSplitter = new RecursiveCharacterTextSplitter({
+    // Create a temporary file path
+    const tempDir = os.tmpdir();
+    const tempFilePath = path.join(tempDir, `temp-${uuidv4()}.pdf`);
+    
+    // Fetch the PDF
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+    }
+    
+    // Convert response to buffer and save to temp file
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    fs.writeFileSync(tempFilePath, buffer);
+    
+    console.log(`PDF saved to temporary file: ${tempFilePath}`);
+    
+    // Use LangChain's PDFLoader to load the document
+    const loader = new PDFLoader(tempFilePath);
+    const docs = await loader.load();
+    console.log(`Loaded ${docs.length} pages from PDF`);
+    
+    // Split the documents into chunks
+    const textSplitter = new CharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 200,
     });
+    
     const splitDocs = await textSplitter.splitDocuments(docs);
-
-    // Create embeddings for the chunks
-    const embeddings = new OpenAIEmbeddings({ openAIApiKey });
-
-    // Create a vector store from the documents
-    const store = await FaissStore.fromDocuments(splitDocs, embeddings);
-
-    // Save the vector store for future use
-    vectorStore = store;
-
-    return store;
+    console.log(`Split into ${splitDocs.length} chunks`);
+    
+    // Clear previous chunks
+    documentChunks = [];
+    
+    // Store chunks in memory
+    splitDocs.forEach((doc: Document, index: number) => {
+      documentChunks.push({
+        content: doc.pageContent,
+        metadata: { 
+          ...doc.metadata,
+          source: url, 
+          chunkIndex: index 
+        }
+      });
+    });
+    
+    console.log(`Stored ${documentChunks.length} chunks in memory`);
+    
+    // Clean up the temporary file
+    try {
+      fs.unlinkSync(tempFilePath);
+      console.log(`Deleted temporary file: ${tempFilePath}`);
+    } catch (unlinkError) {
+      console.error(`Error deleting temporary file: ${unlinkError}`);
+    }
+    
+    return documentChunks.length > 0;
   } catch (error) {
-    console.error("Error processing PDF:", error);
-    throw error;
+    console.error("Error in processURLDirectly:", error);
+    
+    // Fall back to placeholder content
+    console.log("Falling back to placeholder content");
+    const content = `This is a placeholder document for the PDF at URL: ${url}. 
+    There was an error processing the actual PDF content: ${error instanceof Error ? error.message : String(error)}
+    
+    In a production environment, you would want to:
+    1. Use a PDF extraction API service
+    2. Use a serverless function with PDF extraction capabilities
+    3. Use a browser-based PDF.js solution for client-side extraction
+    4. Store extracted text in your database alongside the PDF`;
+    
+    // Split the content into chunks
+    const chunks = content.split('\n\n');
+    
+    // Clear previous chunks
+    documentChunks = [];
+    
+    // Store chunks in memory
+    chunks.forEach(chunk => {
+      if (chunk.trim()) {
+        documentChunks.push({
+          content: chunk.trim(),
+          metadata: { source: url, isPlaceholder: true }
+        });
+      }
+    });
+    
+    console.log(`Stored ${documentChunks.length} placeholder chunks in memory`);
+    return documentChunks.length > 0;
   }
 }
 
-// Handle PDF processing from a URL
-export async function processPDFfromURL(
-  pdfUrl: string, 
-  openAIApiKey: string
-): Promise<FaissStore> {
-  // Fetch the PDF from the URL
-  const response = await fetch(pdfUrl);
-  const pdfBlob = await response.blob();
+// Simple text matching for document retrieval
+function retrieveRelevantChunks(query: string): DocumentChunk[] {
+  console.log("Retrieving relevant chunks for query:", query);
   
-  // Create a temporary file
-  const pdfName = `temp-${Date.now()}.pdf`;
-  const pdfPath = await handleFileUpload(pdfBlob, pdfName);
+  if (documentChunks.length === 0) {
+    console.log("No document chunks available");
+    return [];
+  }
   
-  // Process the PDF
-  return processPDF(pdfPath, openAIApiKey);
+  // Simple keyword matching (in a real app, you'd use embeddings or better search)
+  const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 3);
+  
+  // Score each chunk based on word matches
+  const scoredChunks = documentChunks.map(chunk => {
+    const content = chunk.content.toLowerCase();
+    let score = 0;
+    
+    queryWords.forEach(word => {
+      if (content.includes(word)) {
+        score += 1;
+      }
+    });
+    
+    return { chunk, score };
+  });
+  
+  // Sort by score and take top results
+  const sortedChunks = scoredChunks
+    .sort((a, b) => b.score - a.score)
+    .filter(item => item.score > 0)
+    .slice(0, 3)
+    .map(item => item.chunk);
+  
+  console.log(`Found ${sortedChunks.length} relevant chunks`);
+  return sortedChunks;
 }
 
 // Custom callback handler for streaming tokens
@@ -123,14 +179,14 @@ class StreamingCallbackHandler extends BaseCallbackHandler {
   }
 }
 
-// Handle answering queries using the vectorstore
+// Handle answering queries using the in-memory chunks
 export async function answerQuery(
   query: string,
   openAIApiKey: string,
   streamCallback?: (token: string) => void
 ): Promise<string> {
-  if (!vectorStore) {
-    return "Please upload a PDF document first before asking questions.";
+  if (documentChunks.length === 0) {
+    return "Please provide a PDF document first before asking questions.";
   }
 
   // Create callback handlers
@@ -139,50 +195,54 @@ export async function answerQuery(
     : undefined;
 
   // Initialize the language model
-  const model = new OpenAI({
+  const model = new ChatOpenAI({
     openAIApiKey,
+    model: "gpt-4o-mini",
     temperature: 0,
     streaming: !!streamCallback,
     callbacks: callbackHandlers,
   });
 
-  // Create a retrieval chain using the vector store
-  const retriever = vectorStore.asRetriever();
+  // Retrieve relevant chunks
+  const relevantChunks = retrieveRelevantChunks(query);
   
-  // Define the retrieval-based QA chain
-  const chain = RunnableSequence.from([
-    async (input: { query: string }) => {
-      // Retrieve relevant documents
-      const docs = await retriever.getRelevantDocuments(input.query);
-      
-      // Prepare prompt with retrieved context
-      const context = docs.map(doc => doc.pageContent).join("\n\n");
-      const prompt = `Answer the following question based on the provided context. If the answer cannot be found in the context, say "I don't have enough information to answer this question."
-      
-Context: ${context}
-
-Question: ${input.query}
-
-Answer:`;
-      
-      return { prompt };
-    },
-    async (input: { prompt: string }) => {
-      // Generate answer using the language model
-      const result = await model.invoke(input.prompt);
-      return { answer: result };
-    }
-  ]);
-
-  // Execute the chain
-  const result = await chain.invoke({ query });
+  if (relevantChunks.length === 0) {
+    // No relevant chunks found, use general knowledge
+    const noContextPrompt = `The user is asking about a PDF document, but I couldn't find relevant information in the document. The query is: "${query}"
+    
+    Please provide a general response based on your knowledge, but make it clear that this information is not from the specific document.`;
+    
+    const result = await model.invoke([new HumanMessage(noContextPrompt)]);
+    console.log("Result:", result);
+    return result.content.toString();
+  }
   
-  return result.answer;
+  // Prepare prompt with retrieved context
+  const context = relevantChunks.map(chunk => chunk.content).join("\n\n");
+  console.log("Context:", context);
+  
+  const systemMessage = new SystemMessage(
+    `You are an assistant that answers questions based on the provided context from a PDF document. 
+    If the answer cannot be found in the context, say "I don't have enough information to answer this question."`
+  );
+  
+  const userMessage = new HumanMessage(
+    `Context from the PDF document:
+    ${context}
+    
+    Based on this context only, please answer the following question:
+    ${query}`
+  );
+  
+  // Generate answer using the language model
+  const result = await model.invoke([systemMessage, userMessage]);
+  console.log("Result:", result);
+  return result.content.toString();
 }
 
-// Reset the vectorstore (when a new PDF is uploaded)
+// Reset the stored document chunks
 export function resetVectorStore(): void {
-  vectorStore = null;
+  documentChunks = [];
 }
 
 // Main handler for PDF processing and answering queries
@@ -191,29 +251,46 @@ export async function handlePDFQuery(
   openAIApiKey: string
 ): Promise<string> {
   try {
-    // If a new PDF is provided, process it first
+    console.log("handlePDFQuery called with:", {
+      pdfUrl: query.pdfUrl,
+      pdfBlobUrl: query.pdfBlobUrl,
+      pdfName: query.pdfName,
+      supabaseUrl: query.supabaseUrl,
+      query: query.query
+    });
+
+    let pdfProcessed = false;
+    
+    // If a new PDF is provided, process it
     if (query.pdfUrl || query.pdfBlobUrl || query.supabaseUrl) {
+      console.log("PDF source detected, resetting document store");
       resetVectorStore();
       
-      if (query.supabaseUrl) {
-        // Handle Supabase URL (which is already a direct download link)
-        await processPDFfromURL(query.supabaseUrl, openAIApiKey);
-      } else if (query.pdfUrl) {
-        await processPDFfromURL(query.pdfUrl, openAIApiKey);
-      } else if (query.pdfBlobUrl && query.pdfName) {
-        // For client-side blob URLs, we need to fetch the blob
-        const response = await fetch(query.pdfBlobUrl);
-        const pdfBlob = await response.blob();
-        const pdfPath = await handleFileUpload(pdfBlob, query.pdfName);
-        await processPDF(pdfPath, openAIApiKey);
+      try {
+        const url = query.supabaseUrl || query.pdfUrl || query.pdfBlobUrl;
+        if (url) {
+          console.log("Processing URL directly:", url);
+          pdfProcessed = await processURLDirectly(url);
+        }
+      } catch (processingError) {
+        console.error("Error during PDF URL processing:", processingError);
       }
     }
 
     // Now answer the query
+    console.log("Answering query:", query.query);
+    
+    if (!pdfProcessed && documentChunks.length === 0) {
+      console.log("No PDF was successfully processed, returning a fallback response");
+      return `I'm sorry, I couldn't process the PDF document. There was an issue loading or parsing the file. Please try again with a different file or check the file format. Your query was: "${query.query}"`;
+    }
+    
     const answer = await answerQuery(query.query, openAIApiKey);
+    console.log("Query answered successfully");
     return answer;
   } catch (error: any) {
     console.error("Error handling PDF query:", error);
+    console.error("Error stack:", error.stack);
     return `Error processing your query: ${error.message}`;
   }
-}
+} 
