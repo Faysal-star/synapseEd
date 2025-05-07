@@ -17,6 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 // Types
 interface Question {
   id: string;
@@ -55,7 +57,8 @@ export default function QuestionGenerationPage() {
   
   // Initialize socket connection
   useEffect(() => {
-    const newSocket = io('http://localhost:5000');
+    const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const newSocket = io(socketUrl);
     setSocket(newSocket);
     
     newSocket.on('connect', () => {
@@ -138,7 +141,7 @@ export default function QuestionGenerationPage() {
     formData.append('questions_per_chunk', questionsPerChunk);
     
     try {
-      const response = await fetch('http://localhost:5000/api/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/q-gen/upload`, {
         method: 'POST',
         body: formData,
       });
