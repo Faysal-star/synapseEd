@@ -40,6 +40,8 @@ model Profile {
   notifications Notification[]
   files         File[]
   sharedFiles   FileSharing[]
+  assignmentsCreated Assignment[]
+  assignmentSubmissions AssignmentSubmission[]
   
   @@map("profiles")
 }
@@ -62,6 +64,7 @@ model Course {
   createdBy   Profile   @relation("CourseCreator", fields: [createdById], references: [id])
   teachers    Profile[] @relation("CourseTeachers")
   students    Profile[] @relation("CourseStudents")
+  assignments Assignment[]
   
   @@map("courses")
 }
@@ -294,4 +297,36 @@ enum QuestionDifficulty {
   Easy
   Medium
   Hard
+}
+
+model Assignment {
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  dueDate     DateTime  @map("due_date")
+  courseId    Int       @map("course_id")
+  createdById String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  
+  // Relations
+  course      Course    @relation(fields: [courseId], references: [id])
+  createdBy   Profile   @relation(fields: [createdById], references: [id])
+  submissions AssignmentSubmission[]
+  
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id           String    @id @default(uuid())
+  assignmentId String    @map("assignment_id")
+  userId       String    @map("user_id")
+  fileUrl      String    @map("file_url")
+  submittedAt  DateTime  @default(now()) @map("submitted_at")
+  
+  // Relations
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  user         Profile    @relation(fields: [userId], references: [id])
+  
+  @@map("assignment_submissions")
 }
