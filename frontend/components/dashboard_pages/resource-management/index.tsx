@@ -561,14 +561,17 @@ export default function ResourceManagementPage() {
                 <BreadcrumbLink onClick={() => navigateToFolder([])}>Home</BreadcrumbLink>
               </BreadcrumbItem>
               
-              {currentPath.map((path, index) => (
-                <BreadcrumbItem key={index}>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbLink onClick={() => navigateToBreadcrumb(index)}>
-                    {path}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-              ))}
+              {currentPath.map((path, index) => {
+                const course = resources.find(r => r.type === 'folder' && r.path === path);
+                return (
+                  <BreadcrumbItem key={index}>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbLink onClick={() => navigateToBreadcrumb(index)}>
+                      {course ? course.name : path}
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                );
+              })}
             </Breadcrumb>
           </div>
           
