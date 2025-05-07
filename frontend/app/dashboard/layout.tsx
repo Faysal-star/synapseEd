@@ -25,6 +25,7 @@ import {
   SpeechIcon,
   LogOut,
   LayoutDashboard,
+  BookCheck,
 } from "lucide-react";
 import ChatBot from "@/components/navigation-chatbot";
 import { UserProvider, useUser } from "@/hooks/use-user";
@@ -68,6 +69,11 @@ const teacherNavItems = [
     icon: BookOpen,
     title: "Resource Management",
   },
+  {
+    href: "/dashboard/assignment",
+    icon: BookCheck,
+    title: "Assignments",
+  },
   { href: "/dashboard/ai-agents", icon: Brain, title: "AI Agents" },
   {
     href: "/dashboard/student-analytics",
@@ -87,6 +93,11 @@ const studentNavItems = [
     title: "Class Resources",
   },
   { href: "/dashboard/ai-agents", icon: Brain, title: "AI Agents" },
+  {
+    href: "/dashboard/assignment",
+    icon: BookCheck,
+    title: "Assignments",
+  },
   { href: "/dashboard/exams", icon: BookOpenCheck, title: "Exams" },
   { href: "/dashboard/viva", icon: SpeechIcon, title: "Viva Trainer" },
   { href: "/dashboard/ai-counselor", icon: Users, title: "AI Counselor" },

@@ -249,7 +249,7 @@ export default function AssignmentPage() {
         fileUrl: sub.fileUrl
       }));
 
-      const response = await fetch('http://localhost:5000/check-similarity', {
+      const response = await fetch('http://localhost:5002/check-similarity', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

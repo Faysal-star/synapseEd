@@ -60,7 +60,7 @@ interface AgentType {
 
 export default function AIAgentsPage() {
   const router = useRouter();
-  const [activeAgent, setActiveAgent] = useState<string>('smart-counselor');
+  const [activeAgent, setActiveAgent] = useState<string>('web-search');
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -107,12 +107,12 @@ export default function AIAgentsPage() {
       icon: <Globe className="h-5 w-5" />,
       description: 'Find information and resources from the web'
     },
-    {
-      id: 'smart-counselor',
-      name: 'Smart Counselor',
-      icon: <Brain className="h-5 w-5" />,
-      description: 'Get guidance on personal and academic challenges'
-    },
+    // {
+    //   id: 'smart-counselor',
+    //   name: 'Smart Counselor',
+    //   icon: <Brain className="h-5 w-5" />,
+    //   description: 'Get guidance on personal and academic challenges'
+    // },
     {
       id: 'study-support',
       name: 'Study Support',
