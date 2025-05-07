@@ -279,4 +279,4 @@ class CriticFramework:
             
         except Exception as e:
             print(f"Error generating self-correction: {str(e)}")
-            return f"I apologize, but I encountered an error while trying to verify the information: {str(e)}" 
+            return f"I apologize, but I encountered an error while trying to verify the information: {str(e)}"

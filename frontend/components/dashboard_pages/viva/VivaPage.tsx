@@ -1,40 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useState, useEffect, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import {
-  PauseIcon,
-  PlayIcon,
-  SendIcon,
-  MicIcon,
-  MicOffIcon,
-  VolumeIcon,
-} from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar } from "@/components/ui/avatar";
-import { io, Socket } from "socket.io-client";
-import { useToast } from "@/components/ui/use-toast";
-import { AudioVisualizer } from "./AudioVisualizer";
-import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { toast, useToast } from "@/components/ui/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MicIcon, PauseIcon, SendIcon, ExternalLink } from "lucide-react";
+import { AudioVisualizer } from "./AudioVisualizer";
 
 interface Message {
   role: "user" | "assistant";
@@ -70,9 +49,8 @@ interface FinalReport {
   question_feedback: string[];
 }
 
-// Backend URL
-const VIVA_API_URL =
-  process.env.NEXT_PUBLIC_VIVA_API_URL || "http://localhost:5006";
+// Backend URL - use the unified server URL instead of a separate VIVA URL
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 /**
  * Constructs a proper audio URL based on the path
@@ -89,16 +67,16 @@ const buildAudioUrl = (audioPath: string): string => {
 
   // If it's a relative path to the API, construct the full URL
   if (audioPath.startsWith("/api/viva/audio/")) {
-    return `${VIVA_API_URL}${audioPath}`;
+    return `${BACKEND_API_URL}${audioPath}`;
   }
 
   // If it's a full path on the backend, use it directly with the base URL
   if (audioPath.includes("/")) {
-    return `${VIVA_API_URL}${audioPath.startsWith("/") ? "" : "/"}${audioPath}`;
+    return `${BACKEND_API_URL}${audioPath.startsWith("/") ? "" : "/"}${audioPath}`;
   }
 
   // If it's just a filename, assume it's in the audio directory
-  return `${VIVA_API_URL}/api/viva/audio/${audioPath}`;
+  return `${BACKEND_API_URL}/api/viva/audio/${audioPath}`;
 };
 
 export default function VivaPage() {
@@ -140,8 +118,7 @@ export default function VivaPage() {
   const { toast } = useToast();
 
   // Add a flag to track if we've received a socket response
-  const [receivedSocketResponse, setReceivedSocketResponse] =
-    useState<boolean>(false);
+  const [receivedSocketResponse, setReceivedSocketResponse] = useState<boolean>(false);
 
   // Add new state for socket connection status
   const [socketConnected, setSocketConnected] = useState<boolean>(false);
@@ -157,10 +134,12 @@ export default function VivaPage() {
       setSessionId(newSessionId);
     }
 
-    socketRef.current = io(VIVA_API_URL, {
+    // Connect to the unified server's namespace for VIVA
+    socketRef.current = io(`${BACKEND_API_URL}`, {
       transports: ["websocket"],
       autoConnect: false,
       auth: { sessionId: newSessionId },
+      path: "/socket.io" 
     });
 
     const socket = socketRef.current;
@@ -240,39 +219,39 @@ export default function VivaPage() {
       const isRepeatRequest = data.is_repeat === true;
 
       // Process evaluation data if this is not a repeat request
-      if (!isRepeatRequest) {
-        const evaluation = data.evaluation;
-        if (evaluation) {
-          setQuestionNumber(evaluation.question_number);
-          setTotalQuestions(evaluation.total_questions);
-          setCurrentQuestion(
-            evaluation.question_number < evaluation.total_questions
-              ? evaluation.next_question
-              : null
-          );
+      if (!isRepeatRequest && data.evaluation) {
+        setQuestionNumber(data.evaluation.question_number);
+        setTotalQuestions(data.evaluation.total_questions);
+        
+        // Update current question if available
+        if (data.evaluation.question_number < data.evaluation.total_questions) {
+          setCurrentQuestion(data.evaluation.question);
+        } else {
+          setCurrentQuestion(null);
+        }
 
-          // Update score data
-          if (evaluation.is_completed && evaluation.final_report) {
-            setExamCompleted(true);
-            setFinalReport(evaluation.final_report);
-            setCurrentScore(evaluation.final_report.raw_score);
-            setMaxScore(evaluation.final_report.max_score);
-          }
+        // Update score data
+        if (data.evaluation.is_completed && data.evaluation.final_report) {
+          setExamCompleted(true);
+          setFinalReport(data.evaluation.final_report);
+          setCurrentScore(data.evaluation.final_report.raw_score);
+          setMaxScore(data.evaluation.final_report.max_score);
         }
       }
 
+      // Add AI response to messages
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: data.response,
+          audioUrl: audioUrl,
+          evaluation: isRepeatRequest ? undefined : data.evaluation,
+        },
+      ]);
+
       // Mark that we've received a socket response to prevent duplicate messages
       setReceivedSocketResponse(true);
-
-      // setMessages((prev) => [
-      //   ...prev,
-      //   {
-      //     role: "assistant",
-      //     content: data.response,
-      //     audioUrl: audioUrl,
-      //     evaluation: isRepeatRequest ? undefined : data.evaluation,
-      //   },
-      // ]);
 
       setCurrentAudioUrl(audioUrl);
       setIsAISpeaking(true);
@@ -375,27 +354,26 @@ export default function VivaPage() {
     // Check if backend is healthy
     const checkBackendHealth = async () => {
       try {
-        // Try to directly access the backend health endpoint
-        const response = await fetch(`${VIVA_API_URL}/api/viva/health`, {
-          // Add a timeout to avoid long waiting times
+        // Use the appropriate health endpoint in the unified server
+        const response = await fetch(`${BACKEND_API_URL}/api/viva/health`, {
           signal: AbortSignal.timeout(5000),
         });
 
         if (response.ok) {
           const data = await response.json();
           console.log("Backend server health:", data);
+          
+          // Check if the VIVA service is specifically healthy
+          const vivaHealthy = data.services?.viva !== false;
 
-          if (data.status === "healthy") {
-            console.log("Backend server is healthy");
+          if (data.status === "healthy" && vivaHealthy) {
+            console.log("Backend server and VIVA service are healthy");
           } else {
-            console.warn(
-              "Backend server reported unhealthy status:",
-              data.message
-            );
+            console.warn("Backend server reported issues with VIVA service:", data);
             toast({
               title: "Backend Connection Issue",
               description:
-                "The viva assistant server reported issues. Some features may not work correctly.",
+                "The viva assistant service reported issues. Some features may not work correctly.",
               variant: "destructive",
               duration: 5000,
             });
@@ -408,7 +386,7 @@ export default function VivaPage() {
           toast({
             title: "Backend Connection Issue",
             description:
-              "The viva assistant server appears to be offline. Please try again later.",
+              "The server appears to be offline. Please try again later.",
             variant: "destructive",
             duration: 5000,
           });
@@ -418,7 +396,7 @@ export default function VivaPage() {
         toast({
           title: "Connection Error",
           description:
-            "Unable to connect to the viva assistant server. Please check your connection.",
+            "Unable to connect to the server. Please check your connection.",
           variant: "destructive",
           duration: 5000,
         });
@@ -445,7 +423,8 @@ export default function VivaPage() {
     try {
       // Check backend health directly
       try {
-        const healthResponse = await fetch(`${VIVA_API_URL}/api/viva/health`, {
+        // Use the health endpoint from the unified server
+        const healthResponse = await fetch(`${BACKEND_API_URL}/api/viva/health`, {
           signal: AbortSignal.timeout(3000),
         });
 
@@ -470,7 +449,8 @@ export default function VivaPage() {
         throw new Error(`Backend server health check failed: ${errorMessage}`);
       }
 
-      const response = await fetch(`${VIVA_API_URL}/api/viva/start`, {
+      // Now start the VIVA session using the unified server's endpoint
+      const response = await fetch(`${BACKEND_API_URL}/api/viva/start`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -485,8 +465,9 @@ export default function VivaPage() {
       });
 
       if (!response.ok) {
+        const errorText = await response.text().catch(() => "No error text");
         throw new Error(
-          `Failed to start VIVA session: ${response.status} ${response.statusText}`
+          `Failed to start VIVA session: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
 
@@ -650,40 +631,44 @@ export default function VivaPage() {
           });
 
           try {
-            const response = await fetch(`${VIVA_API_URL}/api/viva/chat`, {
+            // Use the unified server endpoint
+            const response = await fetch(`${BACKEND_API_URL}/api/viva/chat`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "X-Session-ID": sessionId || "",
               },
               body: JSON.stringify({
-                // Let the backend use the stored assistant_id from the session
                 thread_id: sessionId,
                 audio_data: base64Data,
               }),
             });
 
             if (!response.ok) {
-              const errorData = await response
-                .json()
-                .catch(() => ({ message: "Unknown error" }));
+              const errorText = await response.text().catch(() => "Unknown error");
               throw new Error(
-                errorData.message || `Failed with status: ${response.status}`
+                `API error: ${response.status} - ${errorText}`
               );
             }
 
             const data = await response.json();
+            
+            // Update the user message with the transcription
             setMessages((prev) => {
               const newMessages = [...prev];
-              if (
-                newMessages.length > 0 &&
-                newMessages[newMessages.length - 2].role === "user"
-              ) {
-                newMessages[newMessages.length - 2].content = data?.transcription ||
-                  "Sending your response...";
+              // Find the last user message
+              const lastUserIdx = newMessages.findIndex(
+                (msg, idx) => msg.role === "user" && idx === newMessages.length - 1
+              );
+              
+              if (lastUserIdx !== -1) {
+                newMessages[lastUserIdx].content = data?.transcription || 
+                  "Audio response processed";
               }
+              
               return newMessages;
             });
+            
             console.log("Audio response processed:", data);
 
             // Create proper audio URL
@@ -694,34 +679,20 @@ export default function VivaPage() {
             // Check if this is a repeat question response
             const isRepeatRequest = data.is_repeat === true;
 
-            // Update the user message to show the transcription if available
-            setMessages((prev) => {
-              const newMessages = [...prev];
-              // Replace the last message if it's a user message
-              if (
-                newMessages.length > 0 &&
-                newMessages[newMessages.length - 1].role === "user"
-              ) {
-                newMessages[newMessages.length - 1].content =
-                  data.transcription || "Audio response sent";
-              }
-
-              // Only add the AI response if we haven't already received it via socket
-              if (!receivedSocketResponse) {
-                // Add the AI response
-                newMessages.push({
+            // Only add the AI response if we haven't already received it via socket
+            if (!receivedSocketResponse) {
+              // Add the AI response
+              setMessages((prev) => [
+                ...prev,
+                {
                   role: "assistant",
                   content:
                     data.response || data.text || "I received your message.",
                   audioUrl: audioUrl,
                   evaluation: isRepeatRequest ? undefined : data.evaluation,
-                });
-              }
-              return newMessages;
-            });
+                }
+              ]);
 
-            // Only update audio URL and state if we haven't already done so via socket
-            if (!receivedSocketResponse) {
               setCurrentAudioUrl(audioUrl);
               setIsAISpeaking(true);
               setIsMicEnabled(false);
@@ -732,7 +703,7 @@ export default function VivaPage() {
                 setCurrentQuestion(
                   data.evaluation.question_number <
                     data.evaluation.total_questions
-                    ? data.evaluation.next_question
+                    ? data.evaluation.next_question || data.evaluation.question
                     : null
                 );
 
@@ -819,22 +790,22 @@ export default function VivaPage() {
         },
       ]);
 
-      const response = await fetch(`${VIVA_API_URL}/api/viva/chat`, {
+      const response = await fetch(`${BACKEND_API_URL}/api/viva/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Session-ID": sessionId,
         },
         body: JSON.stringify({
-          assistant_id: sessionId,
           thread_id: sessionId,
           text: inputText,
         }),
       });
 
       if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
         throw new Error(
-          `Failed to send text: ${response.status} ${response.statusText}`
+          `API error: ${response.status} - ${errorText}`
         );
       }
 
@@ -869,7 +840,7 @@ export default function VivaPage() {
           setQuestionNumber(data.evaluation.question_number);
           setCurrentQuestion(
             data.evaluation.question_number < data.evaluation.total_questions
-              ? data.evaluation.next_question
+              ? data.evaluation.next_question || data.evaluation.question
               : null
           );
 
@@ -1034,7 +1005,7 @@ export default function VivaPage() {
     if (!sessionId) return;
 
     try {
-      const response = await fetch(`${VIVA_API_URL}/api/viva/progress`, {
+      const response = await fetch(`${BACKEND_API_URL}/api/viva/progress`, {
         headers: {
           "X-Session-ID": sessionId,
         },
@@ -1101,7 +1072,7 @@ export default function VivaPage() {
 
     try {
       console.log(`Cleaning up session ${idToCleanup}...`);
-      await fetch(`${VIVA_API_URL}/api/viva/cleanup`, {
+      await fetch(`${BACKEND_API_URL}/api/viva/cleanup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1123,7 +1094,7 @@ export default function VivaPage() {
       if (sessionId) {
         // Use a synchronous approach for beforeunload
         navigator.sendBeacon(
-          `${VIVA_API_URL}/api/viva/cleanup`,
+          `${BACKEND_API_URL}/api/viva/cleanup`,
           JSON.stringify({ session_id: sessionId })
         );
       }
@@ -1240,7 +1211,7 @@ export default function VivaPage() {
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
                 <CardTitle>Exam Progress</CardTitle>
-                <Badge variant={examCompleted ? "success" : "default"}>
+                <Badge variant={examCompleted ? "default" : "default"}>
                   {examCompleted
                     ? "Completed"
                     : `Question ${questionNumber}/${totalQuestions}`}
@@ -1265,16 +1236,12 @@ export default function VivaPage() {
                     <div className="flex justify-between text-sm text-muted-foreground">
                       <span>Current Score</span>
                       <span>
-                        {currentScore}/{maxScore} (
-                        {maxScore > 0
-                          ? Math.round((currentScore / maxScore) * 100)
-                          : 0}
-                        %)
+                        {currentScore}/{maxScore} ({Math.round((currentScore / maxScore) * 100)}%)
                       </span>
                     </div>
                     <Progress
                       value={(currentScore / (maxScore || 1)) * 100}
-                      className="h-2 bg-slate-200"
+                      className="h-2"
                     />
                   </div>
                 )}
@@ -1304,57 +1271,48 @@ export default function VivaPage() {
               <div className="mb-4">
                 <div className="flex flex-col space-y-2 mb-4">
                   <div className="flex justify-between items-center">
-                    <span>
-                      {isAISpeaking ? "AI is speaking..." : "AI is listening"}
-                    </span>
-                    <div
-                      className={`h-3 w-3 rounded-full ${
-                        isAISpeaking
-                          ? "bg-red-500 animate-pulse"
-                          : "bg-green-500"
-                      }`}
-                    ></div>
+                    <div>
+                      <h3 className="text-sm font-medium">Current Question</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {currentQuestion || "No active question"}
+                      </p>
+                    </div>
+                    {socketConnected ? (
+                      <Badge variant="outline" className="bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400">
+                        Connected
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        Disconnected
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span>Microphone</span>
-                    <div
-                      className={`h-3 w-3 rounded-full ${
-                        isMicEnabled ? "bg-green-500" : "bg-gray-400"
-                      }`}
-                    ></div>
+                    <div className="text-sm text-muted-foreground">
+                      {isAISpeaking 
+                        ? "AI is speaking..." 
+                        : isMicEnabled 
+                        ? "Your turn to speak" 
+                        : "Processing..."}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={reconnectSocket}
+                      disabled={socketConnected}
+                    >
+                      Reconnect
+                    </Button>
                   </div>
 
-                  {/* <div className="flex justify-between items-center">
-                    <span>Socket Connection</span>
-                    <div className="flex items-center">
-                      <div className={`h-3 w-3 rounded-full ${socketConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      {!socketConnected && messages.length > 0 && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={reconnectSocket}
-                          className="ml-2 text-xs p-1 h-6"
-                        >
-                          Reconnect
-                        </Button>
-                      )}
-                    </div>
-                  </div> */}
-
                   {currentAudioUrl && (
-                    <div className="space-y-2">
-                      <Progress value={audioProgress} className="w-full" />
-
-                      <Button
-                        onClick={replayAudio}
-                        variant="outline"
-                        className="w-full"
-                        disabled={isAISpeaking}
-                      >
-                        <VolumeIcon className="mr-2 h-4 w-4" />
-                        Replay Last Response
-                      </Button>
+                    <div className="w-full">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>Audio Progress</span>
+                        <span>{Math.round(audioProgress)}%</span>
+                      </div>
+                      <Progress value={audioProgress} className="h-1" />
                     </div>
                   )}
                 </div>
@@ -1374,61 +1332,37 @@ export default function VivaPage() {
                     }`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-lg p-3 ${
+                      className={`rounded-lg p-3 max-w-[80%] ${
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-100 dark:bg-slate-800"
                       }`}
                     >
-                      <div className="flex items-start gap-2">
-                        <Avatar className="h-6 w-6 mt-1">
-                          {message.role === "user" ? "U" : "AI"}
-                        </Avatar>
-                        <div className="space-y-2 flex-1">
-                          <p className="break-words">{message.content}</p>
-                          {message.role === "assistant" &&
-                            message.evaluation &&
-                            message.evaluation.score !== undefined && (
-                              <div className="mt-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm">
-                                <div className="flex items-center mb-1">
-                                  <div className="font-medium text-xs text-slate-500 dark:text-slate-400 mr-1">
-                                    Score:
-                                  </div>
-                                  <div className="flex items-center">
-                                    {Array.from({ length: 10 }).map((_, i) => (
-                                      <div
-                                        key={i}
-                                        className={`w-2 h-2 rounded-full mx-0.5 ${
-                                          message.evaluation &&
-                                          i < message.evaluation.score
-                                            ? "bg-green-500"
-                                            : "bg-slate-300 dark:bg-slate-600"
-                                        }`}
-                                      />
-                                    ))}
-                                    <span className="ml-2 font-semibold">
-                                      {message.evaluation.score}/10
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          {message.role === "assistant" && message.audioUrl && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                playMessageAudio(message.audioUrl!)
-                              }
-                              className="p-0 h-6"
-                              disabled={isAISpeaking}
-                            >
-                              <PlayIcon className="h-3 w-3 mr-1" />
-                              <span className="text-xs">Play</span>
-                            </Button>
+                      <div className="text-sm">
+                        {message.content || "No content"}
+                      </div>
+                      {message.role === "assistant" && message.audioUrl && (
+                        <div className="mt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 p-0 text-xs"
+                            onClick={() => playMessageAudio(message.audioUrl!)}
+                            disabled={isAISpeaking}
+                          >
+                            Play Audio
+                          </Button>
+                        </div>
+                      )}
+                      {message.evaluation && message.role === "assistant" && (
+                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          {message.evaluation.score !== undefined && (
+                            <span className="font-semibold">
+                              Score: {message.evaluation.score}/10
+                            </span>
                           )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1443,14 +1377,14 @@ export default function VivaPage() {
                   <Badge
                     variant={
                       finalReport.percentage >= 80
-                        ? "success"
+                        ? "default"
                         : finalReport.percentage >= 60
                         ? "default"
                         : "destructive"
                     }
                     className="text-base px-3 py-1"
                   >
-                    {finalReport.grade}
+                    {finalReport.grade} ({Math.round(finalReport.percentage)}%)
                   </Badge>
                 </div>
 
@@ -1466,32 +1400,22 @@ export default function VivaPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white dark:bg-slate-800 rounded-lg p-4 shadow-sm">
                     <h4 className="font-medium text-sm text-green-600 dark:text-green-400 mb-2">
-                      Your Strengths
+                      Strengths
                     </h4>
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      {finalReport.strengths.map((strength, i) => (
-                        <li
-                          key={i}
-                          className="text-slate-700 dark:text-slate-300"
-                        >
-                          {strength}
-                        </li>
+                    <ul className="text-sm list-disc list-inside">
+                      {finalReport.strengths.map((strength, idx) => (
+                        <li key={`strength-${idx}`}>{strength}</li>
                       ))}
                     </ul>
                   </div>
 
                   <div className="bg-white dark:bg-slate-800 rounded-lg p-4 shadow-sm">
                     <h4 className="font-medium text-sm text-amber-600 dark:text-amber-400 mb-2">
-                      Areas to Improve
+                      Areas for Improvement
                     </h4>
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      {finalReport.areas_for_improvement.map((area, i) => (
-                        <li
-                          key={i}
-                          className="text-slate-700 dark:text-slate-300"
-                        >
-                          {area}
-                        </li>
+                    <ul className="text-sm list-disc list-inside">
+                      {finalReport.areas_for_improvement.map((area, idx) => (
+                        <li key={`improvement-${idx}`}>{area}</li>
                       ))}
                     </ul>
                   </div>
@@ -1501,30 +1425,17 @@ export default function VivaPage() {
                   <h4 className="font-medium text-sm text-blue-600 dark:text-blue-400 mb-2">
                     Next Steps
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {finalReport.next_steps.map((step, i) => (
-                      <div key={i} className="flex items-start">
-                        <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mr-2 text-xs font-bold mt-0.5">
-                          {i + 1}
-                        </span>
-                        <p className="text-sm text-slate-700 dark:text-slate-300">
-                          {step}
-                        </p>
-                      </div>
+                  <ul className="text-sm list-disc list-inside">
+                    {finalReport.next_steps.map((step, idx) => (
+                      <li key={`step-${idx}`}>{step}</li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
 
                 <div className="mt-6 text-center">
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-                    Final Score
-                  </p>
-                  <div className="text-3xl font-bold">
-                    {finalReport.raw_score}/{finalReport.max_score}{" "}
-                    <span className="text-lg">
-                      ({finalReport.percentage.toFixed(1)}%)
-                    </span>
-                  </div>
+                  <Button onClick={resetSession} variant="outline">
+                    Start New VIVA
+                  </Button>
                 </div>
               </div>
             )}
@@ -1562,53 +1473,26 @@ export default function VivaPage() {
                 </p>
               )}
 
-              {/* {messages.length > 0 && (
-                <div className="flex w-full max-w-md gap-2">
-                  <Input
-                    placeholder="Type your response or ask to repeat the question..."
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                    disabled={isLoading || isAISpeaking || examCompleted}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendTextResponse();
-                      }
-                    }}
-                    className="flex-1"
-                      />
-                      <Button 
-                        onClick={sendTextResponse}
-                    disabled={isLoading || isAISpeaking || !inputText.trim() || examCompleted}
-                    variant="outline"
-                    type="submit"
-                    size="icon"
-                      >
-                        <SendIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-              )} */}
+              {/* Hidden audio element for playback */}
+              <audio
+                ref={audioRef}
+                className="hidden"
+                controls={false}
+                crossOrigin="anonymous"
+                onError={(e) => {
+                  console.error("Audio element error:", e);
+                  toast({
+                    title: "Audio Error",
+                    description:
+                      "Failed to load audio. The file may be missing or inaccessible.",
+                    variant: "destructive",
+                    duration: 3000,
+                  });
+                  setIsAISpeaking(false);
+                  setIsMicEnabled(true);
+                }}
+              />
             </div>
-
-            {/* Hidden audio element for playback */}
-            <audio
-              ref={audioRef}
-              className="hidden"
-              controls={false}
-              crossOrigin="anonymous"
-              onError={(e) => {
-                console.error("Audio element error:", e);
-                toast({
-                  title: "Audio Error",
-                  description:
-                    "Failed to load audio. The file may be missing or inaccessible.",
-                  variant: "destructive",
-                  duration: 3000,
-                });
-                setIsAISpeaking(false);
-                setIsMicEnabled(true);
-              }}
-            />
           </CardFooter>
         </Card>
       </div>

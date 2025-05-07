@@ -15,7 +15,9 @@ lib/
 lib64/
 parts/
 sdist/
+storage/
 var/
+numpy
 *.egg-info/
 .installed.cfg
 *.egg

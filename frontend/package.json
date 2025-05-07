@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "socket": "tsx server.ts",
+    "socket": "tsx socket/server.ts",
     "dev:all": "concurrently \"pnpm run dev\" \"pnpm run socket\""
   },
   "dependencies": {

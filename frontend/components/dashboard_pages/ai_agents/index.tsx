@@ -177,7 +177,7 @@ export default function AIAgentsPage() {
   const submitFeedback = async (messageId: string, rating: number, feedbackText = '') => {
     try {
       // Call the backend API
-      const backendUrl = 'http://localhost:5003';
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const response = await fetch(`${backendUrl}/api/feedback`, {
         method: 'POST',
         headers: {
@@ -272,8 +272,8 @@ export default function AIAgentsPage() {
           setConversationId(currentConvoId);
         }
         
-        const backendUrl = 'http://localhost:5003';
-        const response = await fetch(`${backendUrl}/api/chat`, {
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${backendUrl}/api/web-search/search`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

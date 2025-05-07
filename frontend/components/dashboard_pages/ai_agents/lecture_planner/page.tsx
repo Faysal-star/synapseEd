@@ -237,7 +237,8 @@ export default function LecturePlannerPage() {
   
   return (
     <div className="w-full h-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <LecturePlannerApiComponent />
+      {/* <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full max-w-md mx-auto mb-6">
           <TabsTrigger value="api-version" className="flex-1">
             API Version
@@ -262,7 +263,7 @@ export default function LecturePlannerPage() {
             </div>
           </Card>
         </TabsContent>
-      </Tabs>
+      </Tabs> */}
     </div>
   );
 }

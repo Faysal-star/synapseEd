@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Base URL for the Flask backend
-const BACKEND_URL = process.env.VIVA_API_URL || 'http://localhost:5006';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // API key for backend authentication - you should set this in your environment variables
 const API_KEY = process.env.VIVA_API_KEY || '';
@@ -209,7 +209,7 @@ export async function GET(request: NextRequest) {
       const audioPathCleaned = audio_path.startsWith('/') ? audio_path.substring(1) : audio_path;
       
       // Get the VIVA API URL from environment variables
-      const VIVA_API_URL = process.env.NEXT_PUBLIC_VIVA_API_URL || 'http://localhost:5006';
+      const VIVA_API_URL = process.env.NEXT_PUBLIC_VIVA_API_URL || 'http://localhost:5000';
       
       // Construct the full URL to the audio file
       const audioUrl = `${VIVA_API_URL}/${audioPathCleaned}`;

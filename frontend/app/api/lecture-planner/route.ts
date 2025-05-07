@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Configure backend API URL for the lecture planner service
-const API_BASE_URL = 'http://localhost:5005';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // Generic handler for all HTTP methods
 async function handleRequest(request: NextRequest, endpoint: string, method: string) {
