@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws';
 import { TLSocketRoom } from '@tldraw/sync-core';
 
-const PORT = 5858;
+const PORT = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : 5858;
 const rooms = new Map<string, TLSocketRoom>();
 
 async function makeOrLoadRoom(roomId: string) {
@@ -38,4 +38,4 @@ wss.on('connection', async (socket, request) => {
   }
 });
 
-console.log(`WebSocket server running on ws://localhost:${PORT}`); 
+console.log(`WebSocket server running on ws://localhost:${PORT}`);

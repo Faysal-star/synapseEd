@@ -27,7 +27,7 @@ app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
 # Configure CORS properly for production
 if app.config['ENV'] == 'production':
     # Only allow specific origins in production
-    allowed_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'https://yourdomain.com').split(',')
+    allowed_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http:localhost:3000').split(',')
     CORS(app, origins=allowed_origins, supports_credentials=True)
 else:
     # Allow all origins in development

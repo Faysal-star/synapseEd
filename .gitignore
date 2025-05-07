@@ -55,5 +55,6 @@ yarn-error.log
 *.swp
 *.swo
 .DS_Store
+logs/
 
 tldraw_socket/

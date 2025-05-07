@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
     const { message, type, image } = body;
 
     // save the image to a file
+    //create uploads folder if not exists
+    if (!fs.existsSync('./public/uploads')) {
+      fs.mkdirSync('./public/uploads', { recursive: true });
+    }
     filePath = `./public/uploads/${Date.now()}.png`;
     if (image) {
       const base64Data = image.replace(/^data:image\/png;base64,/, '');
