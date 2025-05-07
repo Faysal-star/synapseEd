@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { toast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { useDropzone } from 'react-dropzone';
 import { motion } from "framer-motion";
-import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileAudio, FileVideo, MoreHorizontal, Trash, Download, Edit, Share2, Plus, Upload, Search, Folder, FolderPlus, X, Clock, Grid3X3, List, Info, Star } from "lucide-react";
+import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileAudio, FileVideo, MoreHorizontal, Trash, Download, Edit, Share2, Plus, Upload, Search, Folder, FolderPlus, X, Clock, Grid3X3, List, Info, Star, Check } from "lucide-react";
 import { createClient } from '@/utils/supabase/client';
 
 // Types
@@ -43,7 +45,86 @@ export default function ResourceManagementPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   
+  // Add state for share dialog and user selection
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string; avatar_url: string }[]>([]);
+  const [selectedFileToShare, setSelectedFileToShare] = useState<Resource | null>(null);
+
+  // Function to fetch available users from Supabase
+  const fetchAvailableUsers = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, avatar_url');
+
+      if (error) throw error;
+      setAvailableUsers(data || []);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+    }
+  };
+
+  // Function to handle opening share dialog
+  const handleOpenShareDialog = async (file: Resource) => {
+    setSelectedFileToShare(file);
+    setSelectedUsers([]);
+    await fetchAvailableUsers();
+    setShowShareDialog(true);
+  };
+
+  // Function to toggle user selection
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  // Function to handle file sharing
+  const handleShareFile = async () => {
+    if (!selectedFileToShare || selectedUsers.length === 0) return;
+
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Check if user is the file owner
+      if (selectedFileToShare.user_id !== user.id) {
+        throw new Error('You can only share files that you own');
+      }
+
+      // Insert sharing records
+      const { error } = await supabase.from('file_sharing').insert(
+        selectedUsers.map(userId => ({
+          file_id: selectedFileToShare.id,
+          user_id: userId
+        }))
+      );
+
+      if (error) throw error;
+
+      // Close dialog and reset state
+      setShowShareDialog(false);
+      setSelectedUsers([]);
+      setSelectedFileToShare(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to share file';
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: "You can only share files that you own",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Fetch resources from Supabase
   const fetchResources = useCallback(async () => {
     try {
@@ -136,32 +217,31 @@ export default function ResourceManagementPage() {
     if (item.type === 'folder') {
       navigateToFolder(Array.isArray(item.path) ? item.path : [item.path]);
     } else {
-      // Download file from Supabase storage
+      // Get file URL from Supabase storage
       try {
         const supabase = createClient();
-        const { data, error } = await supabase.storage
+        const filePath = Array.isArray(item.path) ? item.path.join('/') : item.path;
+        // Remove duplicate course ID from path if present
+        const cleanPath = filePath.replace(/\/([^\/]+)\/\1\//, '/$1/');
+        
+        const { data } = await supabase.storage
           .from('files')
-          .download(Array.isArray(item.path) ? item.path.join('/') : item.path);
+          .getPublicUrl(cleanPath);
 
         if (error) throw error;
 
-        // Create a download link
-        const url = URL.createObjectURL(data);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = item.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        // Open file in new tab
+        window.open(data.publicUrl, '_blank');
       } catch (err) {
-        console.error('Error downloading file:', err);
+        console.error('Error opening file:', err);
         // Show error toast or notification
       }
     }
   };
 
-  // Create new folder (course)
+
+
+  // Create or update folder (course)
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
     
@@ -169,24 +249,55 @@ export default function ResourceManagementPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-      const newCourse = await createCourse(newFolderName, user.id);
-      setResources(prev => [...prev, newCourse]);
+
+      if (editingCourseId) {
+        // Update existing course
+        const { error } = await supabase
+          .from('courses')
+          .update({ name: newFolderName })
+          .eq('id', editingCourseId);
+
+        if (error) throw error;
+
+        // Update local state
+        setResources(prev =>
+          prev.map(r =>
+            r.id.toString() === editingCourseId ? { ...r, name: newFolderName } : r
+          )
+        );
+      } else {
+        // Create new course
+        const newCourse = await createCourse(newFolderName, user.id);
+        setResources(prev => [...prev, newCourse]);
+      }
+
       setNewFolderName('');
+      setEditingCourseId(null);
       setShowCreateFolderDialog(false);
     } catch (err) {
-      console.error('Error creating course:', err);
+      console.error('Error creating/updating course:', err);
       // Show error toast or notification
     }
   };
 
   // Delete selected items
-  const deleteSelectedItems = async () => {
-    if (selectedItems.length === 0) return;
+  const deleteSelectedItems = async (itemsToDelete?: string[]) => {
+    const itemsToProcess = itemsToDelete || selectedItems;
+    if (itemsToProcess.length === 0) return;
     
     try {
-      for (const id of selectedItems) {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      for (const id of itemsToProcess) {
         const item = resources.find(r => r.id.toString() === id);
         if (!item) continue;
+
+        // Check if user is the owner before deleting
+        if (item.type !== 'folder' && item.user_id !== user.id) {
+          throw new Error('You can only delete files that you own');
+        }
 
         if (item.type === 'folder') {
           await deleteCourse(id);
@@ -198,8 +309,13 @@ export default function ResourceManagementPage() {
       await fetchResources();
       setSelectedItems([]);
     } catch (err) {
-      console.error('Error deleting items:', err);
-      // Show error toast or notification
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete items';
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: "You can only delete files that you own",
+        variant: "destructive"
+      });
     }
   };
 
@@ -336,6 +452,7 @@ export default function ResourceManagementPage() {
 
   return (
     <div className="h-full flex">
+      <Toaster />
       {/* Left sidebar */}
       <div className="w-64 border-r bg-background p-4 flex flex-col">
         <Button
@@ -366,20 +483,51 @@ export default function ResourceManagementPage() {
               >
                 <Folder className="h-4 w-4 flex-shrink-0 text-blue-500" />
                 <span className="truncate">{course.name}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleStar(course.id.toString());
-                  }}
-                  className="ml-auto"
-                >
-                  <Star
-                    className={cn(
-                      "h-3 w-3",
-                      course.starred ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
-                    )}
-                  />
-                </button>
+                <div className="flex items-center gap-1 ml-auto">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleStar(course.id.toString());
+                    }}
+                  >
+                    <Star
+                      className={cn(
+                        "h-3 w-3",
+                        course.starred ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
+                      )}
+                    />
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <button>
+                        <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewFolderName(course.name);
+                          setEditingCourseId(course.id.toString());
+                          setShowCreateFolderDialog(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSelectedItems([course.id.toString()]);
+                        }}
+                      >
+                        <Trash className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </Button>
             ))}
         </div>
@@ -484,7 +632,7 @@ export default function ResourceManagementPage() {
             size="sm"
             className="gap-2"
             disabled={selectedItems.length === 0}
-            onClick={deleteSelectedItems}
+            onClick={() => deleteSelectedItems()}
           >
             <Trash className="h-4 w-4" />
             Delete
@@ -500,11 +648,16 @@ export default function ResourceManagementPage() {
             Download
           </Button>
           
+          {/* Action toolbar share button */}
           <Button
             variant="ghost"
             size="sm"
             className="gap-2"
-            disabled={selectedItems.length === 0}
+            disabled={selectedItems.length !== 1}
+            onClick={() => {
+              const selectedItem = resources.find(r => r.id.toString() === selectedItems[0]);
+              if (selectedItem) handleOpenShareDialog(selectedItem);
+            }}
           >
             <Share2 className="h-4 w-4" />
             Share
@@ -818,7 +971,12 @@ getFileIcon(item.type as FileType)
                         {getSelectedItem()!.starred ? 'Remove Star' : 'Add Star'}
                       </Button>
                       
-                      <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full justify-start gap-2"
+                        onClick={() => handleOpenShareDialog(getSelectedItem()!)}
+                      >
                         <Share2 className="h-4 w-4" />
                         Share
                       </Button>
@@ -855,12 +1013,21 @@ getFileIcon(item.type as FileType)
       </div>
       
       {/* Create a course dialog */}
-      <Dialog open={showCreateFolderDialog} onOpenChange={setShowCreateFolderDialog}>
+      <Dialog 
+        open={showCreateFolderDialog} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingCourseId(null);
+            setNewFolderName('');
+          }
+          setShowCreateFolderDialog(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create new folder</DialogTitle>
+            <DialogTitle>{editingCourseId ? 'Edit folder' : 'Create new folder'}</DialogTitle>
             <DialogDescription>
-              Enter a name for the new folder.
+              {editingCourseId ? 'Edit the folder name.' : 'Enter a name for the new folder.'}
             </DialogDescription>
           </DialogHeader>
           <Input
@@ -874,7 +1041,63 @@ getFileIcon(item.type as FileType)
               Cancel
             </Button>
             <Button onClick={handleCreateFolder}>
-              Create
+              {editingCourseId ? 'Save Changes' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share File</DialogTitle>
+            <DialogDescription>
+              Select users to share "{selectedFileToShare?.name}" with
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[300px] overflow-y-auto py-4">
+            {availableUsers.map(user => (
+              <div
+                key={user.id}
+                className="flex items-center space-x-4 p-2 hover:bg-accent rounded-lg cursor-pointer"
+                onClick={() => toggleUserSelection(user.id)}
+              >
+                <div className="h-10 w-10 rounded-full overflow-hidden bg-muted">
+                  <img
+                    src={user.avatar_url || '/placeholder-user.jpg'}
+                    alt={user.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{user.name}</p>
+                </div>
+                <div className={cn(
+                  'h-5 w-5 rounded-full border-2 flex items-center justify-center',
+                  selectedUsers.includes(user.id)
+                    ? 'bg-primary border-primary'
+                    : 'border-muted-foreground'
+                )}>
+                  {selectedUsers.includes(user.id) && (
+                    <Check className="h-3 w-3 text-white" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </ScrollArea>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowShareDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleShareFile}
+              disabled={selectedUsers.length === 0}
+            >
+              Share
             </Button>
           </DialogFooter>
         </DialogContent>
