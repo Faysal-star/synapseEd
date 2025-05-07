@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,19 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { useDropzone } from 'react-dropzone';
 import { motion } from "framer-motion";
-import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileAudio, FileVideo, MoreHorizontal, Trash, Download, Edit, Share2, Plus, Upload, Search, Folder, FolderPlus, X, Clock, Grid3X3, List, Info, Star, Check, Brain } from "lucide-react";
+import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileAudio, FileVideo, MoreHorizontal, Trash, Download, Edit, Share2, Plus, Upload, Search, Folder, FolderPlus, X, Clock, Grid3X3, List, Info, Star, Check, Brain, SendIcon } from "lucide-react";
 import { createClient } from '@/utils/supabase/client';
 
 // Types
 type FileType = 'folder' | 'pdf' | 'doc' | 'image' | 'archive' | 'audio' | 'video' | 'other';
+
+// Add types for chat messages
+type ChatMessage = {
+  id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+};
 
 import { 
   Resource,
@@ -53,6 +61,20 @@ export default function ResourceManagementPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string; avatar_url: string }[]>([]);
   const [selectedFileToShare, setSelectedFileToShare] = useState<Resource | null>(null);
+
+  // Add state for PDF chat
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [selectedPdf, setSelectedPdf] = useState<Resource | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom of chat when messages change
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
 
   // Function to fetch available users from Supabase
   const fetchAvailableUsers = async () => {
@@ -217,19 +239,35 @@ export default function ResourceManagementPage() {
   const handleItemDoubleClick = async (item: Resource) => {
     if (item.type === 'folder') {
       navigateToFolder(Array.isArray(item.path) ? item.path : [item.path]);
+    } else if (item.type === 'pdf') {
+      // Set the selected PDF for chat and open the AI sidebar
+      console.log('Selected PDF:', item);
+      console.log('PDF Path:', item.path);
+      setSelectedPdf(item);
+      setShowAiAgents(true);
+      
+      // Add welcome message
+      setChatMessages([
+        {
+          id: Date.now().toString(),
+          type: 'assistant',
+          content: `I've loaded "${item.name}". What would you like to know about this document?`,
+          timestamp: new Date()
+        }
+      ]);
     } else {
-      // Get file URL from Supabase storage
+      // Get file URL from Supabase storage for other file types
       try {
         const supabase = createClient();
         const filePath = Array.isArray(item.path) ? item.path.join('/') : item.path;
+        console.log('Original file path:', filePath);
         // Remove duplicate course ID from path if present
         const cleanPath = filePath.replace(/\/([^\/]+)\/\1\//, '/$1/');
+        console.log('Cleaned file path:', cleanPath);
         
         const { data } = await supabase.storage
           .from('files')
           .getPublicUrl(cleanPath);
-
-        if (error) throw error;
 
         // Open file in new tab
         window.open(data.publicUrl, '_blank');
@@ -239,8 +277,6 @@ export default function ResourceManagementPage() {
       }
     }
   };
-
-
 
   // Create or update folder (course)
   const handleCreateFolder = async () => {
@@ -448,6 +484,145 @@ export default function ResourceManagementPage() {
     } catch (err) {
       console.error('Error toggling star:', err);
       // Show error toast or notification
+    }
+  };
+
+  // Function to handle sending a chat message
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentMessage.trim() || !selectedPdf || chatLoading) return;
+
+    try {
+      setChatLoading(true);
+      
+      // Add user message to chat
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        type: 'user',
+        content: currentMessage,
+        timestamp: new Date()
+      };
+      
+      setChatMessages(prev => [...prev, userMessage]);
+      setCurrentMessage('');
+
+      // Get the PDF URL from Supabase
+      const supabase = createClient();
+      const filePath = Array.isArray(selectedPdf.path) ? selectedPdf.path.join('/') : selectedPdf.path;
+      console.log('Original PDF path for API call:', filePath);
+      console.log('Selected PDF details:', selectedPdf);
+      
+      // Remove duplicate course ID from path if present
+      const cleanPath = filePath.replace(/\/([^\/]+)\/\1\//, '/$1/');
+      console.log('Cleaned PDF path for API call:', cleanPath);
+      
+      const { data } = await supabase.storage
+        .from('files')
+        .getPublicUrl(cleanPath);
+
+      if (!data || !data.publicUrl) {
+        throw new Error('Could not get PDF URL from Supabase');
+      }
+
+      console.log('Supabase URL being sent to API:', data.publicUrl);
+
+      // Verify that the URL is accessible with a HEAD request
+      try {
+        const urlCheckResponse = await fetch(data.publicUrl, { method: 'HEAD' });
+        if (!urlCheckResponse.ok) {
+          console.error('Supabase URL may not be accessible:', urlCheckResponse.status, urlCheckResponse.statusText);
+        } else {
+          console.log('Supabase URL is accessible:', urlCheckResponse.status);
+        }
+      } catch (urlErr) {
+        console.error('Error verifying Supabase URL:', urlErr);
+      }
+
+      // Call the context chat API
+      const response = await fetch('/api/context_chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          supabaseUrl: data.publicUrl,
+          query: currentMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`API returned ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('API response:', result);
+
+      // Add assistant response to chat
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: result.answer || "I'm sorry, I couldn't process that PDF.",
+        timestamp: new Date()
+      };
+      
+      setChatMessages(prev => [...prev, assistantMessage]);
+    } catch (err) {
+      console.error('Error sending message:', err);
+      
+      // Add error message to chat
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: "I'm sorry, I encountered an error processing your request. Please try again.",
+        timestamp: new Date()
+      };
+      
+      setChatMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to process PDF",
+        variant: "destructive"
+      });
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // Function to clear the chat context
+  const handleClearChat = async () => {
+    try {
+      // Call the DELETE endpoint to clear the context
+      await fetch('/api/context_chat', {
+        method: 'DELETE',
+      });
+      
+      // Reset chat messages with a new welcome message
+      setChatMessages([
+        {
+          id: Date.now().toString(),
+          type: 'assistant',
+          content: selectedPdf 
+            ? `I've reset the context for "${selectedPdf.name}". What would you like to know?`
+            : "I've reset the context. Please select a PDF to chat about.",
+          timestamp: new Date()
+        }
+      ]);
+      
+      toast({
+        title: "Chat Reset",
+        description: "The conversation context has been cleared.",
+        variant: "default"
+      });
+    } catch (err) {
+      console.error('Error clearing chat context:', err);
+      toast({
+        title: "Error",
+        description: "Failed to clear the chat context. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -727,17 +902,7 @@ export default function ResourceManagementPage() {
                           : "hover:bg-accent/50 border-transparent"
                       )}
                       onClick={() => toggleSelectItem(item.id.toString())}
-                      onDoubleClick={() => handleItemDoubleClick({
-                        id: item.id,
-                        name: item.name,
-                        type: item.type as FileType,
-                        size: item.size ?? null,
-                        modifiedDate: new Date().toISOString(),
-                        course_id: item.course_id,
-                        user_id: item.user_id,
-                        path: item.path,
-                        starred: item.starred
-                      })}
+                      onDoubleClick={() => handleItemDoubleClick(item)}
                     >
                       {/* Star button */}
                       <button 
@@ -1024,49 +1189,80 @@ getFileIcon(item.type as FileType)
             </div>
           )}
           {showAiAgents && (
-            <div className="w-80 border-l bg-muted/20 p-4 flex flex-col">
-              <div className="flex-1 overflow-y-auto space-y-4">
-                <div className="text-center">
-                  <div className="mx-auto mb-3 w-16 h-16 flex items-center justify-center rounded-full bg-muted">
-                    🤖
-                  </div>
-                  <h3 className="font-medium text-lg">AI Assistant</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Ask questions, get help, or explore ideas.
-                  </p>
+            <div className="w-80 border-l bg-muted/20 p-4 flex flex-col h-full">
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-primary" />
+                  <h3 className="font-medium">PDF Chat Assistant</h3>
                 </div>
-
-                <Separator />
-
-                <div className="flex flex-col gap-3 text-sm">
-                  {/* Example Chat Messages */}
-                  <div className="flex flex-col gap-2">
-                    <div className="self-end bg-primary text-primary-foreground px-3 py-2 rounded-xl max-w-[75%]">
-                      What is the size of this file?
-                    </div>
-                    <div className="self-start bg-muted px-3 py-2 rounded-xl max-w-[75%]">
-                      This file is 2.5 MB in size.
-                    </div>
-                  </div>
-                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowAiAgents(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
+              
+              {selectedPdf ? (
+                <div className="bg-muted/30 rounded-md p-3 mb-3 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-red-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{selectedPdf.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(selectedPdf.size || undefined)}</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="flex-shrink-0"
+                    onClick={handleClearChat}
+                    title="Clear chat context"
+                  >
+                    <Trash className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-muted/30 rounded-md p-3 mb-3 text-center">
+                  <p className="text-sm text-muted-foreground">Double-click on a PDF file to start a chat</p>
+                </div>
+              )}
 
-              <Separator className="my-3" />
+              <ScrollArea className="flex-1">
+                <div className="flex flex-col gap-3 pb-4">
+                  {chatMessages.map((message) => (
+                    <div 
+                      key={message.id} 
+                      className={cn(
+                        "max-w-[85%] px-3 py-2 rounded-lg",
+                        message.type === 'user' 
+                          ? "self-end bg-primary text-primary-foreground" 
+                          : "self-start bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-xs opacity-70 mt-1">
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+              </ScrollArea>
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  // handleSendMessage logic here
-                }}
-                className="flex gap-2"
-              >
-                <input
-                  type="text"
-                  placeholder="Type your message..."
-                  className="flex-1 text-sm bg-background border px-3 py-2 rounded-md outline-none focus:ring-2 focus:ring-ring"
+              <form onSubmit={handleSendMessage} className="mt-3 flex gap-2">
+                <Input
+                  value={currentMessage}
+                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  placeholder={selectedPdf ? "Ask about this PDF..." : "Select a PDF first..."}
+                  disabled={!selectedPdf || chatLoading}
+                  className="flex-1"
                 />
-                <Button type="submit" size="sm">
-                  Send
+                <Button 
+                  type="submit" 
+                  size="icon" 
+                  disabled={!selectedPdf || !currentMessage.trim() || chatLoading}
+                >
+                  {chatLoading ? (
+                    <div className="h-4 w-4 border-2 border-current border-t-transparent animate-spin rounded-full" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
                 </Button>
               </form>
             </div>

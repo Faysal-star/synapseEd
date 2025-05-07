@@ -10,6 +10,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  serverExternalPackages : [
+    "faiss-node",
+  ]
 }
 
 export default nextConfig
