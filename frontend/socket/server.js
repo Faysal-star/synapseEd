@@ -2,9 +2,9 @@ import { WebSocketServer } from 'ws';
 import { TLSocketRoom } from '@tldraw/sync-core';
 
 const PORT = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : 5858;
-const rooms = new Map<string, TLSocketRoom>();
+const rooms = new Map();
 
-async function makeOrLoadRoom(roomId: string) {
+async function makeOrLoadRoom(roomId) {
   let room = rooms.get(roomId);
   if (!room) {
     room = new TLSocketRoom({

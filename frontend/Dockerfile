@@ -59,6 +59,7 @@ COPY --from=builder /app/socket ./socket
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/socket/server.ts ./socket/server.ts
 
 # Copy supervisord configuration
 COPY --chown=nextjs:nodejs supervisord.conf /etc/supervisor/conf.d/supervisord.conf
