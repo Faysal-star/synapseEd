@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { useDropzone } from 'react-dropzone';
 import { motion } from "framer-motion";
-import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileAudio, FileVideo, MoreHorizontal, Trash, Download, Edit, Share2, Plus, Upload, Search, Folder, FolderPlus, X, Clock, Grid3X3, List, Info, Star, Check } from "lucide-react";
+import { ChevronRight, FolderOpen, File, FileText, FileImage, FileArchive, FileAudio, FileVideo, MoreHorizontal, Trash, Download, Edit, Share2, Plus, Upload, Search, Folder, FolderPlus, X, Clock, Grid3X3, List, Info, Star, Check, Brain } from "lucide-react";
 import { createClient } from '@/utils/supabase/client';
 
 // Types
@@ -42,6 +42,7 @@ export default function ResourceManagementPage() {
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showDetails, setShowDetails] = useState(false);
+  const [showAiAgents,setShowAiAgents] = useState(false); 
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -608,6 +609,16 @@ export default function ResourceManagementPage() {
             >
               <Info className="h-4 w-4" />
             </Button>
+
+            <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowAiAgents(!showAiAgents)}
+            className={showAiAgents ? 'bg-accent' : ''}
+          >
+            <Brain className="h-4 w-4" /> 
+          </Button>
+
           </div>
         </div>
         
@@ -1007,6 +1018,54 @@ getFileIcon(item.type as FileType)
                   </p>
                 </div>
               )}
+            </div>
+          )}
+          {showAiAgents && (
+            <div className="w-80 border-l bg-muted/20 p-4 flex flex-col">
+              <div className="flex-1 overflow-y-auto space-y-4">
+                <div className="text-center">
+                  <div className="mx-auto mb-3 w-16 h-16 flex items-center justify-center rounded-full bg-muted">
+                    🤖
+                  </div>
+                  <h3 className="font-medium text-lg">AI Assistant</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Ask questions, get help, or explore ideas.
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div className="flex flex-col gap-3 text-sm">
+                  {/* Example Chat Messages */}
+                  <div className="flex flex-col gap-2">
+                    <div className="self-end bg-primary text-primary-foreground px-3 py-2 rounded-xl max-w-[75%]">
+                      What is the size of this file?
+                    </div>
+                    <div className="self-start bg-muted px-3 py-2 rounded-xl max-w-[75%]">
+                      This file is 2.5 MB in size.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator className="my-3" />
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  // handleSendMessage logic here
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  type="text"
+                  placeholder="Type your message..."
+                  className="flex-1 text-sm bg-background border px-3 py-2 rounded-md outline-none focus:ring-2 focus:ring-ring"
+                />
+                <Button type="submit" size="sm">
+                  Send
+                </Button>
+              </form>
             </div>
           )}
         </div>
