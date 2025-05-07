@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "socket": "tsx socket/server.ts",
+    "db": "pnpx prisma generate",
     "dev:all": "concurrently \"pnpm run dev\" \"pnpm run socket\""
   },
   "dependencies": {
