@@ -1,552 +1,241 @@
 
-# SynapseEd - Next-Generation AI-Powered Learning Platform 🚀
+# 📝 SynapseEd - Next-Generation AI-Powered Learning Platform
 
-  
-
-<div  align="center">
-
-  
+<div align="center">
 
 ![SynapseEd Logo](https://img.shields.io/badge/SynapseEd-AI%20Learning-blue)
 
-  
-
 </div>
 
-  
+---
 
 ## 🌟 Overview
 
-  
+**SynapseEd** is a cutting-edge educational platform that revolutionizes learning through advanced AI technologies. It enables real-time collaboration, intelligent content generation, and highly personalized learning experiences to empower both students and educators.
 
-SynapseEd is a cutting-edge educational platform that revolutionizes learning through advanced AI technologies. Our platform seamlessly integrates real-time collaboration, intelligent content generation, and personalized learning experiences to create an engaging and effective educational environment.
-
-  
+---
 
 ## 🛠️ Tech Stack
 
-  
+### 🧩 Frontend Architecture
 
-### Frontend Architecture
+| Category | Technologies |
+| --- | --- |
+| Core Framework | Next.js 15.2.4 , TypeScript |
+| UI/UX | Radix UI, TailwindCSS, Shadcn/ui, Framer Motion |
+| Real-time Features | Socket.IO, Server-Sent Events (SSE), Server-Side Rendering (SSR) |
 
--  **Core Framework**:
+### 🧪 Backend Architecture
 
-- Next.js 15.2.4 (App Router)
+| Category | Technologies |
+| --- | --- |
+| API Framework | Flask, eventlet, NEXT.js |
+| AI/ML Stack | LangChain, LangGraph, OpenAI, Gemini, Groq, Hugging Face Transformers, Tavily |
+| Custom Model | LoRA Fine-Tuned Gemma Model |
+| Vector Database | FAISS |
+| Real-time Infra | WebSocket |
 
-- TypeScript for type safety
+### 🗃️ Database & Storage
 
--  **UI/UX**:
+| Component | Technologies |
+| --- | --- |
+| Primary Database | Supabase PostgreSQL |
+| ORM & Realtime | Prisma ORM, Supabase (Auth & Realtime) |
 
-- Radix UI for accessible components
+---
 
-- TailwindCSS with custom design system
-
-- Framer Motion for fluid animations
-
-- Shadcn/ui for modern components
-
--  **Real-time Features**:
-
-- Socket.IO for real-time communication
-
-- Server-Sent Events for live updates
-- SSR For better performance
-
-  
-
-### Backend Architecture
-
--  **API Framework**:
-
-- Flask
-
-- eventlet
-
--  **AI/ML Stack**:
-
-- LangChain for AI orchestration
-- LangGraph
-
-- OpenAI
-
-- Google's Gemini Pro for multimodal tasks
-
-- Groq for ultra-fast inference
-
-- Hugging Face Transformers
-
-- Tavily for Web search
-- Custom Fine Tuned Gemma Model
-
-  
-
--  **Image Processing**:
-
-- Gemini 2.5 Flash
-
--  **Vector Database**:
-
-- FAISS for local similarity search
-
--  **Real-time Infrastructure**:
-
-- WebSocket for live updates
-
-  
-
-### Database & Storage
-
--  **Primary Database**:
-
-- PostgreSQL
-
-- Prisma ORM for type-safe queries
-
-- Supabase for auth and real-time
-
-  
-
-## ✨ Features
-
-  
+## ✨ Key Features
 
 ### 🤖 AI-Powered Learning
 
-  **Intelligent Content Generation**
+| Feature | Description |
+| --- | --- |
+| **Intelligent Content Gen.** | Dynamic lecture planning, content summarization, class-chat AI |
+| **Personalized Learning** | Progress analytics, performance insights |
+| **AI Counselor** | Personalized feedback based on progress and performance |
 
-- Dynamic lecture planning with AI
+---
 
-- Chat with class contents for better understanding
+### ✒️ AI-Assisted Exam System
 
-- Content summarization
+| **Feature** | **Description** |
+| --- | --- |
+| **Question Generation** | Teachers upload class content (PDF, notes); AI generates MCQs with options, answers, hints, and solutions. |
+| **Exam Creation** | Auto-generates structured exams from approved questions. |
+| **Anti-Cheat System** | Clipboard tracking, tab-switch detection, and webcam-based eye movement monitoring. |
+| **Student Analysis** | Per-question time tracking and topic-wise strength/weakness analysis post-exam. |
+| **Class Analytics** | Teachers get comprehensive performance metrics across the class. |
+---
 
- **Personalized Learning**
+### 🧠 Viva & Evaluation Tools
 
-- Adaptive learning paths
+| Feature | Description |
+| --- | --- |
+| **AI Viva Simulation** | Real-time oral exam simulation, AI verbal response & feedback |
+| **Instant Evaluation** | Real-time assessment with improvement suggestions |
 
-- Progress analytics
+---
 
-- Custom study materials
+### 🧾 Interactive & Collaborative Tools
 
-- Performance insights
+| Feature | Description |
+| --- | --- |
+| **Virtual Whiteboard** | AI-powered, interactive & collaborative |
+| **Shared Docs & Brainstorming** | Multi-user real-time collaboration tools |
+| **Diagram & Summary Tools** | Instant class diagram & summary generation |
 
-**AI Assisted Exam System**
-- AI Exam question generation from class content
-- Detailed question, solution, hints generation for better student understanding
-- Anti-Cheat System for student's exam session
-- Detailed Student performance analytics for every exam 
-- Whole class performance analytics for Teacher
-- AI Counselor based on student's progressive performance
-  
+---
 
-### 🎯 Interactive Learning
+### 🔍 AI Paradigms
 
-  **Real-time Collaboration**
+| Paradigm | Capabilities |
+| --- | --- |
+| **Retrieval-Augmented Generation (RAG)** | Semantic chunking, metadata enrichment, vector search, context retrieval |
+| **Agentic Architecture** | Multi-agent task decomposition, parallelism, error handling, web crawling |
+| **LangGraph Workflows** | Graph-based execution, state management, error recovery |
 
-- Virtual whiteboard with AI Automations
-
-- Interactive diagrams
-- Summary Generation from Live class contents
-
-  
-
-### 🔄 Real-time Features
-
- **Collaborative Tools**
-
-- Shared documents
-
-- Real-time Brainstorming Sessions
-
- **Viva Preparation**
- - Personalized Real Time AI Viva Simulation
- - Real time verbal communication with AI
- - Instant evaluation of performance and improvement suggestions
- 
-
-
-
-  
-
-## 🧠 AI Paradigms
-
-  
-
-### Retrieval-Augmented Generation (RAG)
-
--  **Advanced Chunking**
-
-- Semantic text splitting
-
-- Context preservation
-
-- Metadata enrichment
-
-- Hierarchical structure
-
--  **Knowledge Integration**
-
-- Vector embeddings
-
-- Semantic search
-
-- Context retrieval
-
-- Source validation
-
-  
-
-### Agentic Architecture
-
--  **Multi-Agent System**
-
-- Task decomposition
-
-- Parallel processing
-
-- Error recovery
-
-- State management
-
--  **Intelligent Search**
-
-- Web crawling
-
-- Content verification
-
-- Source validation
-
-- Knowledge synthesis
-
-  
-
-### Graph-Based Execution
-
--  **LangGraph Workflows**
-
-- State management
-
-- Parallel processing
-
-- Error handling
-
-- Recovery mechanisms
-
-### Fine Tuning
-- LoRA Fine Tuned Gemma model for Question Generation
-  
+---
 
 ## 📚 API Documentation
 
-  
-
 ### Content Generation
 
--  **Generate PDF Content**
-
-```http
-
-POST /api/content-gen/pdf/generate
-
-```
-
-Generate lecture content in PDF format with customizable sections and LLM providers.
-
-  
+| Endpoint | Description |
+| --- | --- |
+| `POST /api/content-gen/pdf/generate` | Generate lecture content in PDF format |
 
 ### Lecture Planning
 
--  **Create Lecture Plan**
-
-```http
-
-POST /api/lecture-planner/generate
-
-```
-
-Generate a new lecture plan with customizable difficulty levels.
-
-  
-
--  **Manage Lecture Plan**
-
-```http
-
-GET /api/lecture-planner/{plan_id}
-
-DELETE /api/lecture-planner/{plan_id}
-
-```
-
-Retrieve or delete specific lecture plans.
-
-  
-
--  **Update Lecture Components**
-
-```http
-
-PUT /api/lecture-planner/{plan_id}/topics
-
-PUT /api/lecture-planner/{plan_id}/teaching-methods
-
-PUT /api/lecture-planner/{plan_id}/resources
-
-PUT /api/lecture-planner/{plan_id}/learning-objectives
-
-```
-
-Update various aspects of a lecture plan including topics, teaching methods, resources, and learning objectives.
-
-  
+| Endpoint | Description |
+| --- | --- |
+| `POST /api/lecture-planner/generate` | Generate new lecture plan |
+| `GET/DELETE /api/lecture-planner/{plan_id}` | Retrieve/Delete specific plan |
+| `PUT /api/lecture-planner/{plan_id}/topics` | Update lecture topics |
+| `PUT /api/lecture-planner/{plan_id}/teaching-methods` | Update teaching methods |
+| `PUT /api/lecture-planner/{plan_id}/resources` | Update resources |
+| `PUT /api/lecture-planner/{plan_id}/learning-objectives` | Update learning objectives |
 
 ### Question Generation
 
--  **Upload PDF for Questions**
+| Endpoint | Description |
+| --- | --- |
+| `POST /api/q-gen/upload` | Upload PDF to generate questions |
+| `GET /api/q-gen/status/{job_id}` | Check generation status |
+| `GET /api/q-gen/questions/{job_id}` | Retrieve generated questions |
 
-```http
+### Viva Examination
 
-POST /api/q-gen/upload
-
-```
-
-Upload PDF files to generate questions with customizable parameters.
-
-  
-
--  **Check Generation Status**
-
-```http
-
-GET /api/q-gen/status/{job_id}
-
-GET /api/q-gen/questions/{job_id}
-
-```
-
-Monitor question generation progress and retrieve generated questions.
-
-  
-
-### VIVA Examination
-
--  **Start VIVA Session**
-
-```http
-
-POST /api/viva/start
-
-```
-
-Initialize a new VIVA examination session with customizable difficulty and voice settings.
-
-  
-
--  **Process VIVA Interaction**
-
-```http
-
-POST /api/viva/chat
-
-```
-
-Handle user input (text or audio) during VIVA sessions.
-
-  
-
--  **Cleanup Session**
-
-```http
-
-POST /api/viva/cleanup
-
-```
-
-Clean up session data and associated audio files.
-
-  
+| Endpoint | Description |
+| --- | --- |
+| `POST /api/viva/start` | Start a new viva session |
+| `POST /api/viva/chat` | Process interaction during viva |
+| `POST /api/viva/cleanup` | Clean up session data and audio |
 
 ### Web Search & Memory
 
--  **Perform Web Search**
+| Endpoint | Description |
+| --- | --- |
+| `POST /api/web-search/search` | Perform AI-enhanced web search |
+| `POST /api/web-search/memory-stats` | Retrieve memory and user profile info |
+| `POST /api/web-search/feedback` | Submit feedback for AI search responses |
+> [Incomplete Documentation]
+---
 
-```http
+### 🔧 Sample Requests
 
-POST /api/web-search/search
-
-```
-
-Execute web searches with AI-generated responses and citations.
-
-  
-
--  **Memory Management**
-
-```http
-
-POST /api/web-search/memory-stats
-
-```
-
-Retrieve memory statistics and user profile information.
-
-  
-
--  **Provide Feedback**
-
-```http
-
-POST /api/web-search/feedback
-
-```
-
-Submit feedback for search responses.
-
-  
-
-### Request/Response Examples
-
-  
-
-#### Generate PDF Content
+#### 📄 Generate PDF Content
 
 ```json
-
 {
-
-"topic": "Introduction to Quantum Computing",
-
-"additional_context": "Focus on basic concepts",
-
-"sections": ["Overview", "Key Concepts", "Applications"],
-
-"llm_provider": "openai"
-
+  "topic": "Introduction to Quantum Computing",
+  "additional_context": "Focus on basic concepts",
+  "sections": ["Overview", "Key Concepts", "Applications"],
+  "llm_provider": "openai"
 }
-
 ```
 
-  
-
-#### Start VIVA Session
+#### 🎤 Start VIVA Session
 
 ```json
-
 {
-
-"subject": "Computer Science",
-
-"topic": "Data Structures",
-
-"difficulty": "medium",
-
-"voice": "onyx"
-
+  "subject": "Computer Science",
+  "topic": "Data Structures",
+  "difficulty": "medium",
+  "voice": "onyx"
 }
-
 ```
 
-  
-
-#### Web Search
+#### 🔎 Web Search
 
 ```json
-
 {
-
-"message": "Explain quantum computing basics",
-
-"conversation_id": "conv_123",
-
-"context": {
-
-"user_level": "beginner"
-
+  "message": "Explain quantum computing basics",
+  "conversation_id": "conv_123",
+  "context": {
+    "user_level": "beginner"
+  }
 }
-
-}
-
 ```
-
-  
-
-For detailed API specifications and schema definitions, visit our [API Documentation](https://docs.synapseed.com/api).
-
-  
+> [Incomplete Documentation]
+---
 
 ## 🚀 Getting Started
 
-  
-
-1.  **Prerequisites**
+### 1\. Prerequisites
 
 ```bash
-
 Node.js >= 20
-
 Python >= 3.11
-
 ```
 
-  
-
-2.  **Frontend Setup**
+### 2\. Frontend Setup
 
 ```bash
-
 cd frontend
-
 pnpm install
-
 pnpm run db
-
 pnpm run dev:all
-
 ```
 
-  
-
-3.  **Backend Setup**
+### 3\. Backend Setup
 
 ```bash
-
 cd agents
-
 python -m venv .venv
-
-source venv/bin/activate # or `venv\Scripts\activate` on Windows
-
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-python app.py #Run the app
-
+python app.py
 ```
 
-  
-
-4.  **Environment Configuration**
+### 4\. Environment Setup
 
 ```bash
-
 cp .env.example .env
-
-# Configure your environment variables
-
+# Fill in your environment variables
 ```
 
-  
+### 5\. Access the Platform
 
-5.  **Site Link**
+-   **Frontend**: [http://localhost:3000](http://localhost:3000)
+    
+-   **Backend**: [http://localhost:5000](http://localhost:5000)
+    
 
-  
+---
 
-The site will run on `http://localhost:3000` for the frontend and `http://localhost:5000` for the backend.
+## 👨‍💻 Contributors
 
-  
-  
+|✒️| Name | GitHub |
+|--- | ---  | --- |
+|<img src="https://github.com/faysal-star.png" width="70px" style="border-radius: 50%;" alt="Faysal"/>| Faysal Mahmud  | [Faysal-star](https://github.com/Faysal-star) |
+|<img src="https://github.com/iq-bal.png" width="70px" style="border-radius: 50%;" alt="Iqbal"/>| Iqbal Mahamud  | [iq-bal](https://github.com/iq-bal) |
+|<img src="https://github.com/taut0logy.png" width="70px" style="border-radius: 50%;" alt="Raufun"/>| Raufun Ahsan |[taut0logy](https://github.com/taut0logy) |
+|<img src="https://github.com/abirzishan32.png" width="70px" style="border-radius: 50%;" alt="Abir"/>| Abir Rahman | [abirzishan32](https://github.com/abirzishan32) |
+|<img src="https://github.com/SakiburRahman07.png" width="70px" style="border-radius: 50%;" alt="Sakibur"/>| MD Sakibur Rahman | [SakiburRahman07](https://github.com/SakiburRahman07) |
+---
 
-<div  align="center">
+<div align="center">
 
-Made with ❤️ by the SynapseEd Team
+✨ Made with ❤️ by the SynapseEd Team ✨
 
 </div>
